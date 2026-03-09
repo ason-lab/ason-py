@@ -182,3 +182,24 @@ ASON（约 35 tokens，节省 65%）：
 ## 许可证
 
 MIT
+
+## Latest Benchmarks
+
+在当前机器上通过下面命令实测：
+
+```bash
+bash build.sh
+PYTHONPATH=. python3 examples/bench.py
+```
+
+关键结果：
+
+- 扁平 1,000 条记录：ASON 文本序列化 `118.98ms`，JSON `403.32ms`；反序列化 ASON `221.21ms`，JSON `441.89ms`
+- 扁平 10,000 条记录：ASON 文本序列化 `81.70ms`，JSON `293.38ms`；反序列化 ASON `158.39ms`，JSON `317.44ms`
+- 1,000 条扁平记录体积：JSON `137,674 B`，ASON 文本 `57,761 B`（缩小 `58%`），ASON 二进制 `74,454 B`
+- 1,000 条记录吞吐总结：ASON 文本序列化比 JSON 快 `3.58x`，反序列化快 `2.01x`
+- 二进制模式更快：综合总结中，序列化比 JSON 快 `7.18x`，反序列化快 `4.16x`
+
+## Contributors
+
+- [Athan](https://github.com/athxx)

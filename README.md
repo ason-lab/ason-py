@@ -129,3 +129,24 @@ assert ason.decode(text)               == users
 assert ason.decode(pretty)             == users
 assert ason.decodeBinary(blob, schema) == users
 ```
+
+## Latest Benchmarks
+
+Measured on this machine with:
+
+```bash
+bash build.sh
+PYTHONPATH=. python3 examples/bench.py
+```
+
+Headline numbers:
+
+- Flat 1,000-record dataset: ASON text serialize `118.98ms` vs JSON `403.32ms`, deserialize `221.21ms` vs JSON `441.89ms`
+- Flat 10,000-record dataset: ASON text serialize `81.70ms` vs JSON `293.38ms`, deserialize `158.39ms` vs JSON `317.44ms`
+- Size summary for 1,000 flat records: JSON `137,674 B`, ASON text `57,761 B` (`58%` smaller), ASON binary `74,454 B` (`46%` smaller vs JSON)
+- Throughput summary on 1,000 records: ASON text was `3.58x` faster than JSON for serialize and `2.01x` faster for deserialize
+- Binary mode was even faster: `7.18x` faster than JSON on serialization and `4.16x` faster on deserialization in the benchmark summary
+
+## Contributors
+
+- [Athan](https://github.com/athxx)

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ason"
+version = "0.1.0"
+description = "High-performance ASON (Array-Schema Object Notation) Python extension."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "ason contributors" }
+]
+keywords = ["ason", "serialization", "schema", "llm", "data-format"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Text Processing :: Markup"
+]
+
+[project.urls]
+Homepage = "https://github.com/ason-lab/ason-py"
+Repository = "https://github.com/ason-lab/ason-py"
+Issues = "https://github.com/ason-lab/ason-py/issues"
