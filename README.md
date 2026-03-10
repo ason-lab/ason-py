@@ -4,6 +4,8 @@ C++ pybind11 extension for **ASON** (Array-Schema Object Notation).
 
 Provides 5 functions: `encode`, `decode`, `encodePretty`, `encodeBinary`, `decodeBinary`.
 
+The wheel also ships `ason.pyi` and `py.typed`, so editors and static type checkers can understand the extension module without a separate stub package.
+
 [中文文档](README_CN.md)
 
 ---
@@ -82,6 +84,18 @@ data = ason.encodeBinary(rows, "[{id:int, name:str}]")
 ```python
 rows = ason.decodeBinary(data, "[{id:int, name:str}]")
 ```
+
+## Typing
+
+`ason-py` includes inline typing support for the compiled extension:
+
+```python
+from ason import decode
+
+rows = decode("[{id:int, name:str}]:(1,Alice),(2,Bob)")
+```
+
+Type checkers will infer `dict[str, Any] | list[dict[str, Any]]` for decode results and validate function signatures from the bundled `ason.pyi`.
 
 ---
 

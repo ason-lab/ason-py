@@ -59,5 +59,7 @@ setup(
         "Programming Language :: Python :: Implementation :: CPython",
         "Topic :: Software Development :: Libraries",
     ],
+    include_package_data=True,
+    data_files=[("", ["ason.pyi", "py.typed"])],
     zip_safe=False,
 )

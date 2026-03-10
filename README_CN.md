@@ -4,6 +4,8 @@
 
 提供 5 个函数：`encode`、`decode`、`encodePretty`、`encodeBinary`、`decodeBinary`。
 
+wheel 中同时包含 `ason.pyi` 和 `py.typed`，因此编辑器和静态类型检查器无需额外安装 stub 包也能识别这个扩展模块。
+
 [English Documentation](README.md)
 
 ---
@@ -92,6 +94,18 @@ data = ason.encodeBinary(rows, "[{id:int, name:str}]")
 ```python
 rows = ason.decodeBinary(data, "[{id:int, name:str}]")
 ```
+
+## 类型支持
+
+`ason-py` 为编译后的扩展模块内置了类型声明：
+
+```python
+from ason import decode
+
+rows = decode("[{id:int, name:str}]:(1,Alice),(2,Bob)")
+```
+
+类型检查器会基于随包发布的 `ason.pyi` 校验函数签名，并将解码结果推断为 `dict[str, Any] | list[dict[str, Any]]`。
 
 ---
 
