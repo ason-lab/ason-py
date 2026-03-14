@@ -74,11 +74,11 @@ Type is inferred from all rows (not just the first). A field that is `None` in a
 
 ```python
 ason.encodeTyped({"id": 1, "name": "Alice", "active": True})
-# → '{id:int,name:str,active:bool}:\n(1,Alice,true)\n'
+# → '{id@int,name@str,active@bool}:\n(1,Alice,true)\n'
 
 # Optional field inferred from cross-row merging:
 ason.encodeTyped([{"id": 1, "tag": "hello"}, {"id": 2, "tag": None}])
-# → '[{id:int,tag:str?}]:\n(1,hello),\n(2,)\n'
+# → '[{id@int,tag@str?}]:\n(1,hello),\n(2,)\n'
 ```
 
 ### `encodePretty(obj) -> str` — pretty + untyped, inferred
@@ -99,8 +99,8 @@ Decodes both typed and untyped schemas embedded in the text:
 
 ```python
 # typed schema → values restored as Python types
-rec  = ason.decode('{id:int, name:str}:\n(1,Alice)\n')    # {'id': 1, 'name': 'Alice'}
-rows = ason.decode('[{id:int, name:str}]:\n(1,Alice),\n(2,Bob)\n')
+rec  = ason.decode('{id@int, name@str}:\n(1,Alice)\n')    # {'id': 1, 'name': 'Alice'}
+rows = ason.decode('[{id@int, name@str}]:\n(1,Alice),\n(2,Bob)\n')
 
 # untyped schema → all values returned as strings
 rec2 = ason.decode('{id,name}:\n(1,Alice)\n')             # {'id': '1', 'name': 'Alice'}
@@ -117,7 +117,7 @@ data = ason.encodeBinary(rows)
 Schema is required because the binary wire format carries no embedded type information:
 
 ```python
-rows = ason.decodeBinary(data, "[{id:int, name:str}]")
+rows = ason.decodeBinary(data, "[{id@int, name@str}]")
 ```
 
 ## Typing
@@ -127,7 +127,7 @@ rows = ason.decodeBinary(data, "[{id:int, name:str}]")
 ```python
 from ason import decode
 
-rows = decode("[{id:int, name:str}]:(1,Alice),(2,Bob)")
+rows = decode("[{id@int, name@str}]:(1,Alice),(2,Bob)")
 ```
 
 Type checkers will infer `dict[str, Any] | list[dict[str, Any]]` for decode results and validate function signatures from the bundled `ason.pyi`.
@@ -177,7 +177,7 @@ blob        = ason.encodeBinary(users)     # binary (schema inferred internally)
 
 assert ason.decode(textTyped)  == users    # typed round-trip
 assert ason.decode(pretty)     == users
-assert ason.decodeBinary(blob, "[{id:int, name:str, score:float}]") == users
+assert ason.decodeBinary(blob, "[{id@int, name@str, score@float}]") == users
 ```
 
 ## Latest Benchmarks

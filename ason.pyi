@@ -23,7 +23,7 @@ def encode(obj: JsonObject | list[JsonObject]) -> str:
 def encodeTyped(obj: JsonObject | list[JsonObject]) -> str:
     """Encode to ASON text with inferred *typed* schema.
 
-    The schema header includes type annotations, e.g. ``{id:int,name:str,active:bool}``.
+    The schema header includes type annotations, e.g. ``{id@int,name@str,active@bool}``.
     Type inference rules:
         - ``bool``   → ``bool``
         - ``int``    → ``int``
@@ -38,7 +38,7 @@ def encodeTyped(obj: JsonObject | list[JsonObject]) -> str:
     Example::
 
         encodeTyped({"id": 1, "name": "Alice", "active": True})
-        # → '{id:int,name:str,active:bool}:\\n(1,Alice,true)\\n'
+        # → '{id@int,name@str,active@bool}:\\n(1,Alice,true)\\n'
     """
     ...
 
@@ -62,7 +62,13 @@ def decode(text: str) -> AsonResult:
     The schema is embedded in the text itself (produced by any of the encode
     functions).  Both typed and untyped schemas are supported:
 
-    - **Typed schema** (e.g. ``{id:int,name:str}``): field values are returned
+    Current Python binding scope:
+    - flat structs / record slices
+    - scalar and optional-scalar fields
+    - no legacy ``<...>`` map syntax
+    - no nested ``field@{...}`` / ``field@[...]`` fields
+
+    - **Typed schema** (e.g. ``{id@int,name@str}``): field values are returned
       with their proper Python types (``int``, ``float``, ``bool``, ``str``,
       ``None``).
     - **Untyped schema** (e.g. ``{id,name}``): all field values are returned
@@ -70,7 +76,7 @@ def decode(text: str) -> AsonResult:
 
     Example::
 
-        decode('{id:int,name:str}:\\n(1,Alice)\\n')   # → {'id': 1, 'name': 'Alice'}
+        decode('{id@int,name@str}:\\n(1,Alice)\\n')   # → {'id': 1, 'name': 'Alice'}
         decode('{id,name}:\\n(1,Alice)\\n')            # → {'id': '1', 'name': 'Alice'}
     """
     ...
@@ -91,11 +97,12 @@ def decodeBinary(data: bytes, schema: str) -> AsonResult:
     """Decode ASON binary bytes.
 
     ``schema`` is **required** because the binary wire format carries no embedded
-    type information.
+    type information. The current Python binding accepts flat struct / slice
+    schemas with ``@type`` field annotations.
 
     Example::
 
-        decodeBinary(data, '{id:int, name:str}')
-        decodeBinary(data, '[{id:int, name:str, score:float}]')
+        decodeBinary(data, '{id@int, name@str}')
+        decodeBinary(data, '[{id@int, name@str, score@float}]')
     """
     ...

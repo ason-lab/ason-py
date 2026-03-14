@@ -1,7 +1,7 @@
 """ASON Python — Complex Examples (inference-driven API)
 
-Mirrors the complex examples in ason-go and ason-rs, covering all features
-the Python C++ extension supports.
+Covers the flat struct / slice / scalar cases currently supported by the
+Python extension. Legacy map syntax is not supported.
 
 API (no schema args for encoding):
     encode(obj)              → untyped schema text
@@ -205,7 +205,7 @@ ok("pretty single roundtrip")
 print("\n12. encodeBinary / decodeBinary — single struct:")
 rec12 = {"id": 42, "name": "Alice", "active": True, "score": 9.8}
 bin12 = ason.encodeBinary(rec12)   # schema inferred
-sc12  = "{id:int, name:str, active:bool, score:float}"
+sc12  = "{id@int, name@str, active@bool, score@float}"
 out12 = ason.decodeBinary(bin12, sc12)
 print(f"   binary size: {len(bin12)} bytes")
 assert isinstance(bin12, bytes)
@@ -214,7 +214,7 @@ assert_eq(out12, rec12, "binary single roundtrip")
 
 # ── 13. encodeBinary / decodeBinary — slice ───────────────────────────────────
 print("\n13. encodeBinary / decodeBinary — slice:")
-sc13 = "[{id:int, name:str, email:str, score:float, active:bool}]"
+sc13 = "[{id@int, name@str, email@str, score@float, active@bool}]"
 rows13 = [
     {"id": i, "name": names[i % len(names)],
      "email": f"{names[i%len(names)].lower()}@ex.com",
@@ -240,7 +240,7 @@ assert_raises(lambda: ason.decodeBinary(bin12 + b"\x00", sc12),
 
 # ── 15. Invalid format rejected ──────────────────────────────────────────────
 print("\n15. Invalid format — {schema}: rejected for multi-row content:")
-bad_text = "{id:int, name:str}:\n(1,Alice)\n(2,Bob)\n(3,Carol)\n"
+bad_text = "{id@int, name@str}:\n(1,Alice)\n(2,Bob)\n(3,Carol)\n"
 assert_raises(lambda: ason.decode(bad_text),
               "bad format: struct schema with trailing rows rejected")
 good_text = ason.encodeTyped(rows2)
@@ -250,7 +250,7 @@ ok("good format accepted")
 
 # ── 16. Binary optional fields ───────────────────────────────────────────────
 print("\n16. Binary — optional fields:")
-sc16 = "[{id:int, note:str?, value:float?}]"
+sc16 = "[{id@int, note@str?, value@float?}]"
 rows16 = [
     {"id": 1, "note": "hello", "value": 3.14},
     {"id": 2, "note": None,    "value": None},
@@ -265,7 +265,7 @@ ok("binary optional fields")
 
 # ── 17. Large binary slice ────────────────────────────────────────────────────
 print("\n17. Large binary — 100 records × 8 fields:")
-sc17 = "[{id:int, name:str, email:str, age:int, score:float, active:bool, role:str, city:str}]"
+sc17 = "[{id@int, name@str, email@str, age@int, score@float, active@bool, role@str, city@str}]"
 rows17 = rows9[:100]
 bin17  = ason.encodeBinary(rows17)
 out17  = ason.decodeBinary(bin17, sc17)
@@ -285,7 +285,7 @@ untyped18 = ason.encode(obj18)
 typed18   = ason.encodeTyped(obj18)
 assert untyped18.startswith("{id,name,active}:"), fail("untyped header", untyped18)
 ok("untyped header has no type annotations")
-assert typed18.startswith("{id:int,name:str,active:bool}:"), fail("typed header", typed18)
+assert typed18.startswith("{id@int,name@str,active@bool}:"), fail("typed header", typed18)
 ok("typed header has type annotations")
 assert_eq(ason.decode(typed18), obj18, "typed decode restores types")
 u18 = ason.decode(untyped18)
@@ -303,7 +303,7 @@ ok("empty slice")
 # ── 20. Text/binary result parity ────────────────────────────────────────────
 print("\n20. Text/binary result parity:")
 rows20 = [{"id": i, "name": f"N{i}", "score": i * 0.5} for i in range(10)]
-sc20   = "[{id:int, name:str, score:float}]"
+sc20   = "[{id@int, name@str, score@float}]"
 from_text = ason.decode(ason.encodeTyped(rows20))
 from_bin  = ason.decodeBinary(ason.encodeBinary(rows20), sc20)
 assert_eq(from_text, from_bin, "text == binary results")

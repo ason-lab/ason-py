@@ -8,6 +8,9 @@ API (inference-driven, no manual schema for encoding):
     encodeBinary(obj)        → bytes (schema inferred internally)
     decode(text)             → dict | list[dict]
     decodeBinary(data, schema) → dict | list[dict]  (schema required for binary)
+
+Current Python support focuses on flat structs / slices with scalar and optional
+scalar fields. Legacy map syntax is not supported.
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -53,7 +56,7 @@ data = ason.encodeBinary(users)
 print(f"encodeBinary: {len(data)} bytes")
 
 # binary wire format has no embedded types — schema must be explicit for decode
-SCHEMA = "[{id:int, name:str}]"
+SCHEMA = "[{id@int, name@str}]"
 restored = ason.decodeBinary(data, SCHEMA)
 print("decodeBinary:", restored)
 assert restored == users

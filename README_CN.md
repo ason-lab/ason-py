@@ -74,11 +74,11 @@ ason.encode([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
 
 ```python
 ason.encodeTyped({"id": 1, "name": "Alice", "active": True})
-# → '{id:int,name:str,active:bool}:\n(1,Alice,true)\n'
+# → '{id@int,name@str,active@bool}:\n(1,Alice,true)\n'
 
 # 跨行类型归并：
 ason.encodeTyped([{"id": 1, "tag": "hello"}, {"id": 2, "tag": None}])
-# → '[{id:int,tag:str?}]:\n(1,hello),\n(2,)\n'
+# → '[{id@int,tag@str?}]:\n(1,hello),\n(2,)\n'
 ```
 
 ### `encodePretty(obj) -> str` — pretty + 无类型，自动推断
@@ -99,8 +99,8 @@ pretty = ason.encodePrettyTyped(rows)
 
 ```python
 # typed schema → 还原 Python 类型
-rec  = ason.decode('{id:int, name:str}:\n(1,Alice)\n')    # {'id': 1, 'name': 'Alice'}
-rows = ason.decode('[{id:int, name:str}]:\n(1,Alice),\n(2,Bob)\n')
+rec  = ason.decode('{id@int, name@str}:\n(1,Alice)\n')    # {'id': 1, 'name': 'Alice'}
+rows = ason.decode('[{id@int, name@str}]:\n(1,Alice),\n(2,Bob)\n')
 
 # untyped schema → 所有值以字符串返回
 rec2 = ason.decode('{id,name}:\n(1,Alice)\n')             # {'id': '1', 'name': 'Alice'}
@@ -119,7 +119,7 @@ data = ason.encodeBinary(rows)
 **必须传 schema**，因为二进制 wire format 不嵌入任何类型信息：
 
 ```python
-rows = ason.decodeBinary(data, "[{id:int, name:str}]")
+rows = ason.decodeBinary(data, "[{id@int, name@str}]")
 ```
 
 ## 类型支持
@@ -129,7 +129,7 @@ rows = ason.decodeBinary(data, "[{id:int, name:str}]")
 ```python
 from ason import decode
 
-rows = decode("[{id:int, name:str}]:(1,Alice),(2,Bob)")
+rows = decode("[{id@int, name@str}]:(1,Alice),(2,Bob)")
 ```
 
 类型检查器会基于随包发布的 `ason.pyi` 校验函数签名，并将解码结果推断为 `dict[str, Any] | list[dict[str, Any]]`。
@@ -179,7 +179,7 @@ blob        = ason.encodeBinary(users)     # 二进制（schema 内部推断）
 
 assert ason.decode(textTyped) == users     # 有类型 round-trip（完整还原）
 assert ason.decode(pretty)    == users
-assert ason.decodeBinary(blob, "[{id:int, name:str, score:float}]") == users
+assert ason.decodeBinary(blob, "[{id@int, name@str, score@float}]") == users
 ```
 
 ---
@@ -193,7 +193,7 @@ python3 examples/basic.py
 # 综合示例（20 个场景）
 python3 examples/complex.py
 
-# 性能基准测试（与 json 模块对比，按 untyped / typed / binary 分类展示）
+# 性能基准测试（按 JSON / ASON / BIN 统一风格展示）
 python3 examples/bench.py
 ```
 
@@ -208,7 +208,7 @@ JSON（100 tokens）：
 {"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false}]}
 
 ASON（约 35 tokens，节省 65%）：
-[{id:int, name:str, active:bool}]:(1,Alice,true),(2,Bob,false)
+[{id@int, name@str, active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 | 方面 | JSON | ASON |

@@ -1,4 +1,4 @@
-// ason_py.cpp — C++ pybind11 extension (inference-driven v3)
+// ason_py.cpp — C++ pybind11 extension (inference-driven)
 //
 //   encode(obj)                    → str   (untyped schema, inferred)
 //   encodeTyped(obj)               → str   (typed schema, inferred)
@@ -7,6 +7,10 @@
 //   decode(text)                   → dict | list[dict]
 //   encodeBinary(obj)              → bytes (schema inferred internally)
 //   decodeBinary(data, schema)     → dict | list[dict]
+//
+// Current scope:
+//   flat structs / slices with scalar + optional scalar fields
+//   no legacy map syntax
 //
 // Type inference rules:
 //   PyBool       → bool
@@ -101,6 +105,16 @@ static FieldType infer_type(PyObject* val) noexcept {
     return FieldType::Str;
 }
 
+static void ensure_supported_value(PyObject* val) {
+    if (val == Py_None || PyBool_Check(val) || PyLong_Check(val) || PyFloat_Check(val) || PyUnicode_Check(val)) {
+        return;
+    }
+    if (PyDict_Check(val) || PyList_Check(val) || PyTuple_Check(val)) {
+        ason_throw("nested structured values are not supported in the Python binding");
+    }
+    ason_throw("unsupported Python value type");
+}
+
 // ---------------------------------------------------------------------------
 // Type merging: combine inferred type from multiple rows
 // Rule: if a later row has None for a field that was non-optional, upgrade to optional.
@@ -147,6 +161,8 @@ static InferredSchema infer_schema(PyObject* sample, bool is_slice, PyObject* al
         const char* kstr = PyUnicode_AsUTF8AndSize(k, &klen);
         if (!kstr) { Py_DECREF(keys); ason_throw("field key must be str"); }
 
+        ensure_supported_value(val);
+
         PyObject* key = PyUnicode_FromStringAndSize(kstr, klen);
         if (!key) { Py_DECREF(keys); throw std::bad_alloc(); }
         PyUnicode_InternInPlace(&key);
@@ -161,9 +177,10 @@ static InferredSchema infer_schema(PyObject* sample, bool is_slice, PyObject* al
         for (Py_ssize_t r = 1; r < nrows; ++r) {  // start from 1 (0 = sample)
             PyObject* rec = PyList_GET_ITEM(all_data, r);
             for (size_t fi = 0; fi < sc.fields.size(); ++fi) {
-                PyObject* val = PyDict_GetItem(rec, sc.fields[fi].key);
-                FieldType incoming = infer_type(val ? val : Py_None);
-                sc.fields[fi].type = merge_type(sc.fields[fi].type, incoming);
+            PyObject* val = PyDict_GetItem(rec, sc.fields[fi].key);
+            ensure_supported_value(val ? val : Py_None);
+            FieldType incoming = infer_type(val ? val : Py_None);
+            sc.fields[fi].type = merge_type(sc.fields[fi].type, incoming);
             }
         }
     }
@@ -186,7 +203,7 @@ static std::string build_untyped_header(const InferredSchema& sc) {
     return h;
 }
 
-// Build the typed header string, e.g. "{id:int,name:str,active:bool}"
+// Build the typed header string, e.g. "{id@int,name@str,active@bool}"
 static std::string build_typed_header(const InferredSchema& sc) {
     std::string h;
     h.reserve(sc.fields.size() * 14 + 4);
@@ -195,7 +212,7 @@ static std::string build_typed_header(const InferredSchema& sc) {
     for (size_t i = 0; i < sc.fields.size(); ++i) {
         if (i) h += ',';
         h += sc.fields[i].name;
-        h += ':';
+        h += '@';
         h += type_name(sc.fields[i].type);
     }
     h += '}';
@@ -222,6 +239,10 @@ static CachedSchema parse_schema(const std::string& s) {
     const char* end = p + s.size();
     CachedSchema sc;
 
+    if (s.find('<') != std::string::npos || s.find('>') != std::string::npos) {
+        ason_throw("legacy map syntax '<...>' is not supported; use arrays or entry lists instead");
+    }
+
     while (p < end && (unsigned char)*p <= ' ') ++p;
     if (p < end && *p == '[') { sc.is_slice = true; ++p; }
     while (p < end && (unsigned char)*p <= ' ') ++p;
@@ -233,20 +254,23 @@ static CachedSchema parse_schema(const std::string& s) {
         if (p >= end || *p == '}') { if (p < end) ++p; break; }
 
         const char* ns = p;
-        while (p < end && *p != ':' && *p != ',' && *p != '}' && (unsigned char)*p > ' ') ++p;
+        while (p < end && *p != '@' && *p != ',' && *p != '}' && (unsigned char)*p > ' ') ++p;
         std::string name(ns, p - ns);
 
         while (p < end && (unsigned char)*p <= ' ') ++p;
 
-        // ── typed field: "name:type" ──────────────────────────────────────────
+        // ── typed field: "name@type" ──────────────────────────────────────────
         FieldType ft = FieldType::Str;  // default for untyped fields
-        if (p < end && *p == ':') {
-            ++p;  // consume ':'
+        if (p < end && *p == '@') {
+            ++p;  // consume '@'
             while (p < end && (unsigned char)*p <= ' ') ++p;
 
             const char* ts = p;
             while (p < end && *p != ',' && *p != '}' && (unsigned char)*p > ' ') ++p;
             std::string tname(ts, p - ts);
+            if (!tname.empty() && (tname[0] == '{' || tname[0] == '[')) {
+                ason_throw("nested structured fields are not supported in the Python binding");
+            }
             bool opt = !tname.empty() && tname.back() == '?';
             if (opt) tname.pop_back();
 
@@ -257,7 +281,7 @@ static CachedSchema parse_schema(const std::string& s) {
             else if (tname == "str")   ft = opt ? FieldType::StrOpt   : FieldType::Str;
             else ason_throw("unknown type '" + tname + "' for field '" + name + "'");
         }
-        // else: untyped field (no ':type') → treat as str (decode returns strings)
+        // else: untyped field (no '@type') → treat as str (decode returns strings)
 
         PyObject* key = PyUnicode_FromStringAndSize(name.data(), (Py_ssize_t)name.size());
         if (!key) throw std::bad_alloc();
@@ -852,7 +876,7 @@ static py::object ason_decode_binary(py::bytes data, const std::string& schema_s
 // Module
 // ---------------------------------------------------------------------------
 PYBIND11_MODULE(ason, m) {
-    m.doc() = "ASON — Array-Schema Object Notation (inference-driven C++ pybind11 extension).";
+    m.doc() = "ASON — Array-Schema Object Notation (Python binding for flat structs and record slices).";
     py::register_exception<std::runtime_error>(m, "AsonError");
 
     m.def("encode",           &ason_encode,           py::arg("obj"),
