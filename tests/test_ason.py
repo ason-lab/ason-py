@@ -245,6 +245,17 @@ class TestStringEscaping:
         assert ason.decode(ason.encodePrettyTyped(obj)) == obj
         assert ason.decodeBinary(ason.encodeBinary(obj), '{s@str}') == obj
 
+    def test_reject_schema_type_aliases(self):
+        for text in [
+            '{id@integer,name@str}:(1,Alice)',
+            '{id@int,name@string}:(1,Alice)',
+            '{score@double}:(3.5)',
+            '{active@boolean}:(true)',
+            '{tags@[string]}:([Alice])',
+        ]:
+            with pytest.raises(Exception):
+                ason.decode(text)
+
 
 # ---------------------------------------------------------------------------
 # 7.  Special float values
