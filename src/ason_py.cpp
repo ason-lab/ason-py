@@ -115,6 +115,47 @@ static void ensure_supported_value(PyObject* val) {
     ason_throw("unsupported Python value type");
 }
 
+static bool schema_name_needs_quotes(std::string_view s) noexcept {
+    if (s.empty()) return true;
+    if (s == "true" || s == "false") return true;
+    if (s.front() == ' ' || s.back() == ' ') return true;
+    bool could_be_number = true;
+    size_t num_start = (s.front() == '-') ? 1 : 0;
+    if (num_start >= s.size()) could_be_number = false;
+    for (size_t i = 0; i < s.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c <= 0x20 || c == ',' || c == '@' || c == ':' || c == '{' || c == '}' ||
+            c == '[' || c == ']' || c == '(' || c == ')' || c == '"' || c == '\\') {
+            return true;
+        }
+        if (could_be_number && i >= num_start && !((c >= '0' && c <= '9') || c == '.')) {
+            could_be_number = false;
+        }
+    }
+    return could_be_number && s.size() > num_start;
+}
+
+static void append_schema_name(std::string& out, std::string_view name) {
+    if (!schema_name_needs_quotes(name)) {
+        out.append(name.data(), name.size());
+        return;
+    }
+    out.push_back('"');
+    for (char ch : name) {
+        switch (ch) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            default: out.push_back(ch); break;
+        }
+    }
+    out.push_back('"');
+}
+
 // ---------------------------------------------------------------------------
 // Type merging: combine inferred type from multiple rows
 // Rule: if a later row has None for a field that was non-optional, upgrade to optional.
@@ -196,7 +237,7 @@ static std::string build_untyped_header(const InferredSchema& sc) {
     h += '{';
     for (size_t i = 0; i < sc.fields.size(); ++i) {
         if (i) h += ',';
-        h += sc.fields[i].name;
+        append_schema_name(h, sc.fields[i].name);
     }
     h += '}';
     if (sc.is_slice) h += ']';
@@ -211,7 +252,7 @@ static std::string build_typed_header(const InferredSchema& sc) {
     h += '{';
     for (size_t i = 0; i < sc.fields.size(); ++i) {
         if (i) h += ',';
-        h += sc.fields[i].name;
+        append_schema_name(h, sc.fields[i].name);
         h += '@';
         h += type_name(sc.fields[i].type);
     }
@@ -253,9 +294,34 @@ static CachedSchema parse_schema(const std::string& s) {
         while (p < end && (unsigned char)*p <= ' ') ++p;
         if (p >= end || *p == '}') { if (p < end) ++p; break; }
 
-        const char* ns = p;
-        while (p < end && *p != '@' && *p != ',' && *p != '}' && (unsigned char)*p > ' ') ++p;
-        std::string name(ns, p - ns);
+        std::string name;
+        if (p < end && *p == '"') {
+            ++p;
+            while (p < end) {
+                if (*p == '"') { ++p; break; }
+                if (*p == '\\') {
+                    ++p;
+                    if (p >= end) ason_throw("unterminated quoted field name");
+                    switch (*p) {
+                        case '"': name.push_back('"'); break;
+                        case '\\': name.push_back('\\'); break;
+                        case 'n': name.push_back('\n'); break;
+                        case 'r': name.push_back('\r'); break;
+                        case 't': name.push_back('\t'); break;
+                        case 'b': name.push_back('\b'); break;
+                        case 'f': name.push_back('\f'); break;
+                        default: name.push_back(*p); break;
+                    }
+                    ++p;
+                    continue;
+                }
+                name.push_back(*p++);
+            }
+        } else {
+            const char* ns = p;
+            while (p < end && *p != '@' && *p != ',' && *p != '}' && (unsigned char)*p > ' ') ++p;
+            name.assign(ns, p - ns);
+        }
 
         while (p < end && (unsigned char)*p <= ' ') ++p;
 

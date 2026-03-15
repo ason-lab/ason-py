@@ -337,3 +337,30 @@ class TestFieldNamesSpecialChars:
         obj = {"user_name": "Alice", "is_active": True}
         out = ason.decode(ason.encodeTyped(obj))
         assert out == obj
+
+    def test_quoted_schema_names_roundtrip_all_text_apis(self):
+        obj = {"id uuid": 1, "65": "Alice", '{}[]@"': True}
+
+        untyped = ason.encode(obj)
+        assert untyped.startswith('{"id uuid","65","{}[]@\\""')
+        assert ason.decode(untyped) == {"id uuid": "1", "65": "Alice", '{}[]@"': "true"}
+
+        typed = ason.encodeTyped(obj)
+        assert typed.startswith('{"id uuid"@int,"65"@str,"{}[]@\\""@bool}')
+        assert ason.decode(typed) == obj
+
+        pretty = ason.encodePretty(obj)
+        assert ason.decode(pretty) == {"id uuid": "1", "65": "Alice", '{}[]@"': "true"}
+
+        pretty_typed = ason.encodePrettyTyped(obj)
+        assert ason.decode(pretty_typed) == obj
+
+    def test_decode_explicit_quoted_schema_names(self):
+        out = ason.decode('{"id uuid"@int,"65"@str,"{}[]@\\""@bool}:(1,Alice,true)')
+        assert out == {"id uuid": 1, "65": "Alice", '{}[]@"': True}
+
+    def test_binary_with_quoted_schema_names(self):
+        obj = {"id uuid": 1, "65": "Alice", '{}[]@"': True}
+        data = ason.encodeBinary(obj)
+        out = ason.decodeBinary(data, '{"id uuid"@int,"65"@str,"{}[]@\\""@bool}')
+        assert out == obj
