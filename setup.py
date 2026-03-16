@@ -45,7 +45,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="ason",
-    version="0.1.0",
+    version="1.0.0",
     author="ason contributors",
     description="High-performance ASON (Array-Schema Object Notation) Python extension",
     long_description=(Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
