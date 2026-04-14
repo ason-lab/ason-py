@@ -1,4 +1,4 @@
-"""ASON Python — Complex Examples (inference-driven API)
+"""ASUN Python — Complex Examples (inference-driven API)
 
 Covers the flat struct / slice / scalar cases currently supported by the
 Python extension. Legacy map syntax is not supported.
@@ -15,7 +15,7 @@ API (no schema args for encoding):
 
 import sys, os, json, math
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import ason
+import asun
 
 errors = 0
 
@@ -42,21 +42,21 @@ def assert_ne(a, b, tag):
 def assert_raises(fn, tag):
     try:
         fn()
-        fail(tag, "expected AsonError but no exception raised")
-    except ason.AsonError:
+        fail(tag, "expected AsunError but no exception raised")
+    except asun.AsunError:
         ok(tag)
     except Exception as e:
         fail(tag, f"unexpected exception: {e}")
 
-print("=== ASON Complex Examples ===")
+print("=== ASUN Complex Examples ===")
 print()
 
 # ── 1. Basic single-struct — encodeTyped / decode ────────────────────────────
 print("1. Basic single-struct encode / decode:")
 rec1 = {"id": 1, "name": "Alice", "active": True}
-text1 = ason.encodeTyped(rec1)
+text1 = asun.encodeTyped(rec1)
 print(f"   encodeTyped: {repr(text1)}")
-out1 = ason.decode(text1)
+out1 = asun.decode(text1)
 assert_eq(out1, rec1, "basic typed roundtrip")
 
 # ── 2. Slice of structs ──────────────────────────────────────────────────────
@@ -66,9 +66,9 @@ rows2 = [
     {"id": 2, "name": "Bob",   "active": False},
     {"id": 3, "name": "Carol Smith", "active": True},
 ]
-text2 = ason.encodeTyped(rows2)
+text2 = asun.encodeTyped(rows2)
 print(f"   encodeTyped ({len(text2)} bytes):\n{text2}")
-out2 = ason.decode(text2)
+out2 = asun.decode(text2)
 assert_eq(out2, rows2, "slice roundtrip")
 
 # ── 3. Optional fields ───────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ rows3 = [
     {"id": 2, "note": None,       "score": None},
     {"id": 3, "note": "only-str", "score": None},
 ]
-out3 = ason.decode(ason.encodeTyped(rows3))
+out3 = asun.decode(asun.encodeTyped(rows3))
 assert_eq(out3, rows3, "optional present+null roundtrip")
 assert_eq(out3[1]["note"], None, "null field is None")
 assert_eq(out3[1]["score"], None, "null float? is None")
@@ -97,13 +97,13 @@ cases4 = [
 ]
 for val, label in cases4:
     rec = {"text": val}
-    out = ason.decode(ason.encodeTyped(rec))
+    out = asun.decode(asun.encodeTyped(rec))
     assert_eq(out["text"], val, f"escape: {label}")
 
 # ── 5. Float fields ──────────────────────────────────────────────────────────
 print("\n5. Float fields:")
 m5 = {"id": 2, "value": 95.0, "label": "score"}
-out5 = ason.decode(ason.encodeTyped(m5))
+out5 = asun.decode(asun.encodeTyped(m5))
 assert_eq(out5["id"],   2,    "float: int field")
 assert_eq(out5["label"], "score", "float: str field")
 assert abs(out5["value"] - 95.0) < 1e-12, fail("float: value", f"{out5['value']}")
@@ -112,7 +112,7 @@ ok("float roundtrip")
 # ── 6. Negative numbers ──────────────────────────────────────────────────────
 print("\n6. Negative numbers:")
 n6 = {"a": -42, "b": -3.14, "c": -9223372036854775807}
-out6 = ason.decode(ason.encodeTyped(n6))
+out6 = asun.decode(asun.encodeTyped(n6))
 assert_eq(out6["a"], -42, "negative int")
 assert abs(out6["b"] - (-3.14)) < 1e-12
 ok("negative float")
@@ -121,13 +121,13 @@ ok("negative roundtrip")
 
 # ── 7. Special float values ──────────────────────────────────────────────────
 print("\n7. Special float values:")
-nan_out = ason.decode(ason.encodeTyped({"v": float("nan")}))
+nan_out = asun.decode(asun.encodeTyped({"v": float("nan")}))
 assert math.isnan(nan_out["v"]) or True  # nan!=nan by design
 ok("nan roundtrip")
-inf_out = ason.decode(ason.encodeTyped({"v": float("inf")}))
+inf_out = asun.decode(asun.encodeTyped({"v": float("inf")}))
 assert math.isinf(inf_out["v"]) and inf_out["v"] > 0
 ok("+inf roundtrip")
-ninf_out = ason.decode(ason.encodeTyped({"v": float("-inf")}))
+ninf_out = asun.decode(asun.encodeTyped({"v": float("-inf")}))
 assert math.isinf(ninf_out["v"]) and ninf_out["v"] < 0
 ok("-inf roundtrip")
 
@@ -138,9 +138,9 @@ all8 = {
     "fv": 2.718281828459045, "sv": "hello, world (test) [arr]",
     "oi": 42,
 }
-text8 = ason.encodeTyped(all8)
+text8 = asun.encodeTyped(all8)
 print(f"   serialized ({len(text8)} bytes):\n   {repr(text8)}")
-out8 = ason.decode(text8)
+out8 = asun.decode(text8)
 assert_eq(out8["b"],  True,  "all-types: bool")
 assert_eq(out8["iv"], -9223372036854775807, "all-types: int min")
 assert abs(out8["fv"] - 2.718281828459045) < 1e-12
@@ -167,9 +167,9 @@ rows9 = [
     }
     for i in range(1000)
 ]
-text9_typed   = ason.encodeTyped(rows9)
-text9_untyped = ason.encode(rows9)
-out9 = ason.decode(text9_typed)
+text9_typed   = asun.encodeTyped(rows9)
+text9_untyped = asun.encode(rows9)
+out9 = asun.decode(text9_typed)
 assert_eq(len(out9), 1000, "large slice: count")
 assert_eq(out9[0]["name"],   rows9[0]["name"],   "large slice: first name")
 assert_eq(out9[999]["id"],   999,                 "large slice: last id")
@@ -177,7 +177,7 @@ assert_eq(out9[42]["active"], rows9[42]["active"], "large slice: active flag")
 json_bytes = len(json.dumps(rows9).encode())
 typed_bytes   = len(text9_typed.encode())
 untyped_bytes = len(text9_untyped.encode())
-print(f"   ASON typed: {typed_bytes} B | ASON untyped: {untyped_bytes} B | JSON: {json_bytes} B | "
+print(f"   ASUN typed: {typed_bytes} B | ASUN untyped: {untyped_bytes} B | JSON: {json_bytes} B | "
       f"typed vs JSON: {(1 - typed_bytes/json_bytes)*100:.0f}% smaller")
 ok("large slice roundtrip")
 
@@ -185,9 +185,9 @@ ok("large slice roundtrip")
 print("\n10. encodePrettyTyped:")
 rows10 = [{"id": 1, "name": "Alice", "score": 9.5},
           {"id": 2, "name": "Bob",   "score": 7.2}]
-pretty10 = ason.encodePrettyTyped(rows10)
+pretty10 = asun.encodePrettyTyped(rows10)
 print(f"   pretty output:\n{pretty10}")
-out10 = ason.decode(pretty10)
+out10 = asun.decode(pretty10)
 assert_eq(out10, rows10, "pretty typed roundtrip")
 assert "    (" in pretty10
 ok("pretty has indentation")
@@ -195,18 +195,18 @@ ok("pretty has indentation")
 # ── 11. encodePrettyTyped — single struct ────────────────────────────────────
 print("11. encodePrettyTyped — single struct:")
 rec11 = {"name": "my-service", "version": "2.1.0", "port": 5432, "ssl": True, "timeout": 3000.5}
-pretty11 = ason.encodePrettyTyped(rec11)
+pretty11 = asun.encodePrettyTyped(rec11)
 print(f"   pretty:\n{pretty11}")
-out11 = ason.decode(pretty11)
+out11 = asun.decode(pretty11)
 assert_eq(out11, rec11, "pretty typed single roundtrip")
 ok("pretty single roundtrip")
 
 # ── 12. encodeBinary / decodeBinary — single ─────────────────────────────────
 print("\n12. encodeBinary / decodeBinary — single struct:")
 rec12 = {"id": 42, "name": "Alice", "active": True, "score": 9.8}
-bin12 = ason.encodeBinary(rec12)   # schema inferred
+bin12 = asun.encodeBinary(rec12)   # schema inferred
 sc12  = "{id@int, name@str, active@bool, score@float}"
-out12 = ason.decodeBinary(bin12, sc12)
+out12 = asun.decodeBinary(bin12, sc12)
 print(f"   binary size: {len(bin12)} bytes")
 assert isinstance(bin12, bytes)
 ok("binary type check")
@@ -221,11 +221,11 @@ rows13 = [
      "score": float(i) * 0.5, "active": i % 2 == 0}
     for i in range(500)
 ]
-bin13   = ason.encodeBinary(rows13)
-out13   = ason.decodeBinary(bin13, sc13)
-text13  = ason.encodeTyped(rows13)
+bin13   = asun.encodeBinary(rows13)
+out13   = asun.decodeBinary(bin13, sc13)
+text13  = asun.encodeTyped(rows13)
 json13  = json.dumps(rows13).encode()
-print(f"   BIN: {len(bin13)} B | ASON typed text: {len(text13)} B | JSON: {len(json13)} B")
+print(f"   BIN: {len(bin13)} B | ASUN typed text: {len(text13)} B | JSON: {len(json13)} B")
 print(f"   BIN vs JSON: {(1 - len(bin13)/len(json13))*100:.0f}% smaller | "
       f"TEXT vs JSON: {(1 - len(text13)/len(json13))*100:.0f}% smaller")
 assert_eq(len(out13), 500, "binary slice: count")
@@ -235,16 +235,16 @@ ok("binary slice roundtrip")
 
 # ── 14. Binary — trailing data rejected ──────────────────────────────────────
 print("\n14. Binary — trailing data rejected:")
-assert_raises(lambda: ason.decodeBinary(bin12 + b"\x00", sc12),
+assert_raises(lambda: asun.decodeBinary(bin12 + b"\x00", sc12),
               "binary trailing byte rejected")
 
 # ── 15. Invalid format rejected ──────────────────────────────────────────────
 print("\n15. Invalid format — {schema}: rejected for multi-row content:")
 bad_text = "{id@int, name@str}:\n(1,Alice)\n(2,Bob)\n(3,Carol)\n"
-assert_raises(lambda: ason.decode(bad_text),
+assert_raises(lambda: asun.decode(bad_text),
               "bad format: struct schema with trailing rows rejected")
-good_text = ason.encodeTyped(rows2)
-out_good = ason.decode(good_text)
+good_text = asun.encodeTyped(rows2)
+out_good = asun.decode(good_text)
 assert_eq(len(out_good), 3, "good format: slice schema accepted")
 ok("good format accepted")
 
@@ -256,8 +256,8 @@ rows16 = [
     {"id": 2, "note": None,    "value": None},
     {"id": 3, "note": "world", "value": None},
 ]
-bin16 = ason.encodeBinary(rows16)
-out16 = ason.decodeBinary(bin16, sc16)
+bin16 = asun.encodeBinary(rows16)
+out16 = asun.decodeBinary(bin16, sc16)
 assert_eq(out16, rows16, "binary optional roundtrip")
 assert_eq(out16[1]["note"],  None, "binary null str?")
 assert_eq(out16[1]["value"], None, "binary null float?")
@@ -267,13 +267,13 @@ ok("binary optional fields")
 print("\n17. Large binary — 100 records × 8 fields:")
 sc17 = "[{id@int, name@str, email@str, age@int, score@float, active@bool, role@str, city@str}]"
 rows17 = rows9[:100]
-bin17  = ason.encodeBinary(rows17)
-out17  = ason.decodeBinary(bin17, sc17)
+bin17  = asun.encodeBinary(rows17)
+out17  = asun.decodeBinary(bin17, sc17)
 assert_eq(len(out17), 100, "large binary: count")
 assert_eq(out17[0],  rows17[0],  "large binary: first")
 assert_eq(out17[99], rows17[99], "large binary: last")
 json17 = json.dumps(rows17).encode()
-text17 = ason.encodeTyped(rows17).encode()
+text17 = asun.encodeTyped(rows17).encode()
 print(f"   BIN: {len(bin17)} B | TEXT: {len(text17)} B | JSON: {len(json17)} B | "
       f"BIN vs JSON: {(1 - len(bin17)/len(json17))*100:.0f}% smaller")
 ok("large binary slice roundtrip")
@@ -281,22 +281,22 @@ ok("large binary slice roundtrip")
 # ── 18. encode vs encodeTyped — header format difference ─────────────────────
 print("\n18. encode vs encodeTyped — header format difference:")
 obj18 = {"id": 1, "name": "Alice", "active": True}
-untyped18 = ason.encode(obj18)
-typed18   = ason.encodeTyped(obj18)
+untyped18 = asun.encode(obj18)
+typed18   = asun.encodeTyped(obj18)
 assert untyped18.startswith("{id,name,active}:"), fail("untyped header", untyped18)
 ok("untyped header has no type annotations")
 assert typed18.startswith("{id@int,name@str,active@bool}:"), fail("typed header", typed18)
 ok("typed header has type annotations")
-assert_eq(ason.decode(typed18), obj18, "typed decode restores types")
-u18 = ason.decode(untyped18)
+assert_eq(asun.decode(typed18), obj18, "typed decode restores types")
+u18 = asun.decode(untyped18)
 assert isinstance(u18["id"], str), fail("untyped id is str", type(u18["id"]))
 ok("untyped id decoded as str (expected)")
 
 # ── 19. Empty slice ──────────────────────────────────────────────────────────
 print("\n19. Edge case — empty slice:")
-text19 = ason.encode([])
+text19 = asun.encode([])
 print(f"   empty slice: {repr(text19)}")
-out19 = ason.decode(text19)
+out19 = asun.decode(text19)
 assert_eq(out19, [], "empty slice roundtrip")
 ok("empty slice")
 
@@ -304,8 +304,8 @@ ok("empty slice")
 print("\n20. Text/binary result parity:")
 rows20 = [{"id": i, "name": f"N{i}", "score": i * 0.5} for i in range(10)]
 sc20   = "[{id@int, name@str, score@float}]"
-from_text = ason.decode(ason.encodeTyped(rows20))
-from_bin  = ason.decodeBinary(ason.encodeBinary(rows20), sc20)
+from_text = asun.decode(asun.encodeTyped(rows20))
+from_bin  = asun.decodeBinary(asun.encodeBinary(rows20), sc20)
 assert_eq(from_text, from_bin, "text == binary results")
 ok("text/binary parity")
 

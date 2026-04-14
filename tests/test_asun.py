@@ -1,4 +1,4 @@
-"""Tests for the ason C++ pybind11 extension (inference-driven v3).
+"""Tests for the asun C++ pybind11 extension (inference-driven v3).
 
 Design note:
     encode(obj)      → untyped schema {id,name,active}:...  (all fields decode as str)
@@ -22,7 +22,7 @@ import math
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-import ason
+import asun
 
 
 # ---------------------------------------------------------------------------
@@ -32,27 +32,27 @@ import ason
 class TestEncodeSchemaHeader:
     def test_encode_untyped_header(self):
         rec = {"id": 1, "name": "Alice"}
-        text = ason.encode(rec)
+        text = asun.encode(rec)
         assert text.startswith("{id,name}:")
 
     def test_encode_typed_header(self):
         rec = {"id": 1, "name": "Alice"}
-        text = ason.encodeTyped(rec)
+        text = asun.encodeTyped(rec)
         assert text.startswith("{id@int,name@str}:")
 
     def test_encode_slice_untyped_header(self):
         rows = [{"id": 1, "name": "Alice"}]
-        text = ason.encode(rows)
+        text = asun.encode(rows)
         assert text.startswith("[{id,name}]:")
 
     def test_encode_slice_typed_header(self):
         rows = [{"id": 1, "name": "Alice"}]
-        text = ason.encodeTyped(rows)
+        text = asun.encodeTyped(rows)
         assert text.startswith("[{id@int,name@str}]:")
 
     def test_empty_list_encodes(self):
-        text = ason.encode([])
-        out = ason.decode(text)
+        text = asun.encode([])
+        out = asun.decode(text)
         assert out == []
 
 
@@ -63,29 +63,29 @@ class TestEncodeSchemaHeader:
 class TestEncodeTypedRoundtrip:
     def test_basic_int_str(self):
         rec = {"id": 1, "name": "Alice"}
-        assert ason.decode(ason.encodeTyped(rec)) == rec
+        assert asun.decode(asun.encodeTyped(rec)) == rec
 
     def test_float_field(self):
         rec = {"id": 1, "value": 3.14}
-        out = ason.decode(ason.encodeTyped(rec))
+        out = asun.decode(asun.encodeTyped(rec))
         assert out["id"] == 1
         assert abs(out["value"] - 3.14) < 1e-9
 
     def test_bool_field(self):
         rec = {"active": True, "name": "Bob"}
-        assert ason.decode(ason.encodeTyped(rec)) == rec
+        assert asun.decode(asun.encodeTyped(rec)) == rec
 
     def test_negative_int(self):
         rec = {"x": -42}
-        assert ason.decode(ason.encodeTyped(rec)) == rec
+        assert asun.decode(asun.encodeTyped(rec)) == rec
 
     def test_slice_roundtrip(self):
         rows = [{"id": i, "name": f"user{i}"} for i in range(50)]
-        assert ason.decode(ason.encodeTyped(rows)) == rows
+        assert asun.decode(asun.encodeTyped(rows)) == rows
 
     def test_float_slice(self):
         rows = [{"x": 1.5, "y": -2.5}, {"x": 0.0, "y": 100.0}]
-        out = ason.decode(ason.encodeTyped(rows))
+        out = asun.decode(asun.encodeTyped(rows))
         for a, b in zip(rows, out):
             assert abs(a["x"] - b["x"]) < 1e-9
             assert abs(a["y"] - b["y"]) < 1e-9
@@ -97,23 +97,23 @@ class TestEncodeTypedRoundtrip:
 
 class TestTypeInference:
     def test_int_inferred(self):
-        text = ason.encodeTyped({"n": 42})
+        text = asun.encodeTyped({"n": 42})
         assert "n@int" in text
 
     def test_float_inferred(self):
-        text = ason.encodeTyped({"v": 3.14})
+        text = asun.encodeTyped({"v": 3.14})
         assert "v@float" in text
 
     def test_bool_inferred(self):
-        text = ason.encodeTyped({"f": False})
+        text = asun.encodeTyped({"f": False})
         assert "f@bool" in text
 
     def test_str_inferred(self):
-        text = ason.encodeTyped({"s": "hello"})
+        text = asun.encodeTyped({"s": "hello"})
         assert "s@str" in text
 
     def test_none_inferred_as_str_optional(self):
-        text = ason.encodeTyped({"tag": None})
+        text = asun.encodeTyped({"tag": None})
         assert "tag@str?" in text
 
 
@@ -124,23 +124,23 @@ class TestTypeInference:
 class TestEncodePretty:
     def test_pretty_untyped_has_indent(self):
         rec = {"id": 1, "name": "Alice"}
-        pretty = ason.encodePretty(rec)
+        pretty = asun.encodePretty(rec)
         assert "    (" in pretty
 
     def test_pretty_typed_roundtrip_single(self):
         rec = {"id": 1, "name": "Alice"}
-        pretty = ason.encodePrettyTyped(rec)
-        assert ason.decode(pretty) == rec
+        pretty = asun.encodePrettyTyped(rec)
+        assert asun.decode(pretty) == rec
 
     def test_pretty_typed_roundtrip_slice(self):
         rows = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
-        pretty = ason.encodePrettyTyped(rows)
-        assert ason.decode(pretty) == rows
+        pretty = asun.encodePrettyTyped(rows)
+        assert asun.decode(pretty) == rows
 
     def test_pretty_typed_full(self):
         rows = [{"id": i, "score": i * 1.5, "active": (i % 2 == 0)}
                 for i in range(10)]
-        out = ason.decode(ason.encodePrettyTyped(rows))
+        out = asun.decode(asun.encodePrettyTyped(rows))
         assert len(out) == 10
         for r, o in zip(rows, out):
             assert r["id"] == o["id"]
@@ -149,7 +149,7 @@ class TestEncodePretty:
 
     def test_pretty_large_slice(self):
         rows = [{"id": i, "name": f"item{i}", "v": float(i)} for i in range(100)]
-        out = ason.decode(ason.encodePrettyTyped(rows))
+        out = asun.decode(asun.encodePrettyTyped(rows))
         assert len(out) == 100
         assert out[99]["id"] == 99
 
@@ -161,48 +161,48 @@ class TestEncodePretty:
 class TestBinaryRoundtrip:
     def test_single_int_str(self):
         rec = {"id": 42, "name": "Alice"}
-        data = ason.encodeBinary(rec)
-        out = ason.decodeBinary(data, "{id@int, name@str}")
+        data = asun.encodeBinary(rec)
+        out = asun.decodeBinary(data, "{id@int, name@str}")
         assert out == rec
 
     def test_single_float_bool(self):
         rec = {"score": 99.5, "active": True}
-        data = ason.encodeBinary(rec)
-        out = ason.decodeBinary(data, "{score@float, active@bool}")
+        data = asun.encodeBinary(rec)
+        out = asun.decodeBinary(data, "{score@float, active@bool}")
         assert abs(out["score"] - 99.5) < 1e-12
         assert out["active"] is True
 
     def test_slice_roundtrip(self):
         rows = [{"id": i, "name": f"user{i}"} for i in range(20)]
-        data = ason.encodeBinary(rows)
-        out = ason.decodeBinary(data, "[{id@int, name@str}]")
+        data = asun.encodeBinary(rows)
+        out = asun.decodeBinary(data, "[{id@int, name@str}]")
         assert out == rows
 
     def test_binary_is_bytes(self):
-        data = ason.encodeBinary({"x": 1})
+        data = asun.encodeBinary({"x": 1})
         assert isinstance(data, bytes)
 
     def test_binary_int_encoding(self):
         """int must be encoded as 8 bytes little-endian i64."""
-        data = ason.encodeBinary({"x": 256})
+        data = asun.encodeBinary({"x": 256})
         v = struct.unpack_from("<q", data, 0)[0]
         assert v == 256
 
     def test_binary_trailing_rejected(self):
-        data = ason.encodeBinary({"id": 1, "name": "Alice"})
-        with pytest.raises(ason.AsonError):
-            ason.decodeBinary(data + b"\x00", "{id@int, name@str}")
+        data = asun.encodeBinary({"id": 1, "name": "Alice"})
+        with pytest.raises(asun.AsunError):
+            asun.decodeBinary(data + b"\x00", "{id@int, name@str}")
 
     def test_large_slice_binary(self):
         rows = [{"id": i, "v": float(i)} for i in range(500)]
-        data = ason.encodeBinary(rows)
-        out = ason.decodeBinary(data, "[{id@int, v@float}]")
+        data = asun.encodeBinary(rows)
+        out = asun.decodeBinary(data, "[{id@int, v@float}]")
         assert len(out) == 500
         assert out[499]["id"] == 499
 
     def test_empty_slice_binary(self):
-        data = ason.encodeBinary([])
-        out = ason.decodeBinary(data, "[{id@int}]")
+        data = asun.encodeBinary([])
+        out = asun.decodeBinary(data, "[{id@int}]")
         assert out == []
 
 
@@ -213,37 +213,37 @@ class TestBinaryRoundtrip:
 class TestStringEscaping:
     def test_comma_in_string(self):
         rec = {"s": "hello, world"}
-        assert ason.decode(ason.encodeTyped(rec))["s"] == "hello, world"
+        assert asun.decode(asun.encodeTyped(rec))["s"] == "hello, world"
 
     def test_newline_in_string(self):
         rec = {"s": "line1\nline2"}
-        assert ason.decode(ason.encodeTyped(rec))["s"] == "line1\nline2"
+        assert asun.decode(asun.encodeTyped(rec))["s"] == "line1\nline2"
 
     def test_tab_in_string(self):
         rec = {"s": "col1\tcol2"}
-        assert ason.decode(ason.encodeTyped(rec))["s"] == "col1\tcol2"
+        assert asun.decode(asun.encodeTyped(rec))["s"] == "col1\tcol2"
 
     def test_backslash_in_string(self):
         rec = {"s": "path\\to\\file"}
-        assert ason.decode(ason.encodeTyped(rec))["s"] == "path\\to\\file"
+        assert asun.decode(asun.encodeTyped(rec))["s"] == "path\\to\\file"
 
     def test_parens_in_string(self):
         rec = {"s": "(nested)"}
-        assert ason.decode(ason.encodeTyped(rec))["s"] == "(nested)"
+        assert asun.decode(asun.encodeTyped(rec))["s"] == "(nested)"
 
     def test_empty_string(self):
         rec = {"s": ""}
-        assert ason.decode(ason.encodeTyped(rec))["s"] == ""
+        assert asun.decode(asun.encodeTyped(rec))["s"] == ""
 
     def test_at_string_roundtrip_all_apis(self):
         obj = {"s": "@Alice"}
-        plain = ason.encode(obj)
+        plain = asun.encode(obj)
         assert '"@Alice"' in plain
-        assert ason.decode(plain) == obj
-        assert ason.decode(ason.encodeTyped(obj)) == obj
-        assert ason.decode(ason.encodePretty(obj)) == obj
-        assert ason.decode(ason.encodePrettyTyped(obj)) == obj
-        assert ason.decodeBinary(ason.encodeBinary(obj), '{s@str}') == obj
+        assert asun.decode(plain) == obj
+        assert asun.decode(asun.encodeTyped(obj)) == obj
+        assert asun.decode(asun.encodePretty(obj)) == obj
+        assert asun.decode(asun.encodePrettyTyped(obj)) == obj
+        assert asun.decodeBinary(asun.encodeBinary(obj), '{s@str}') == obj
 
     def test_reject_invalid_schema_types(self):
         for text in [
@@ -254,7 +254,7 @@ class TestStringEscaping:
             '{tags@[textx]}:([Alice])',
         ]:
             with pytest.raises(Exception):
-                ason.decode(text)
+                asun.decode(text)
 
 
 # ---------------------------------------------------------------------------
@@ -264,18 +264,18 @@ class TestStringEscaping:
 class TestSpecialFloats:
     def test_nan_roundtrip(self):
         rec = {"v": float("nan")}
-        text = ason.encodeTyped(rec)
-        out = ason.decode(text)
+        text = asun.encodeTyped(rec)
+        out = asun.decode(text)
         assert math.isnan(out["v"])
 
     def test_inf_roundtrip(self):
         rec = {"v": float("inf")}
-        out = ason.decode(ason.encodeTyped(rec))
+        out = asun.decode(asun.encodeTyped(rec))
         assert math.isinf(out["v"]) and out["v"] > 0
 
     def test_neg_inf_roundtrip(self):
         rec = {"v": float("-inf")}
-        out = ason.decode(ason.encodeTyped(rec))
+        out = asun.decode(asun.encodeTyped(rec))
         assert math.isinf(out["v"]) and out["v"] < 0
 
 
@@ -286,33 +286,33 @@ class TestSpecialFloats:
 class TestDecodeErrors:
     def test_trailing_rows_rejected(self):
         text = "{id@int, name@str}:\n(1,Alice)\n(2,Bob)\n"
-        with pytest.raises(ason.AsonError):
-            ason.decode(text)
+        with pytest.raises(asun.AsunError):
+            asun.decode(text)
 
     def test_bad_format_multi_tuples_for_single(self):
         bad = "{id@int, name@str}:\n  (1, Alice),\n  (2, Bob),\n  (3, Carol)"
-        with pytest.raises(ason.AsonError):
-            ason.decode(bad)
+        with pytest.raises(asun.AsunError):
+            asun.decode(bad)
 
     def test_bad_format_extra_tuples(self):
-        with pytest.raises(ason.AsonError):
-            ason.decode("{id@int,name@str}:(10,Dave),(11,Eve)")
+        with pytest.raises(asun.AsunError):
+            asun.decode("{id@int,name@str}:(10,Dave),(11,Eve)")
 
     def test_legacy_map_syntax_rejected(self):
-        with pytest.raises(ason.AsonError):
-            ason.decode("{cfg@<str,str>}:(x)")
+        with pytest.raises(asun.AsunError):
+            asun.decode("{cfg@<str,str>}:(x)")
 
     def test_nested_structured_schema_rejected(self):
-        with pytest.raises(ason.AsonError):
-            ason.decode("{cfg@{name@str}}:(x)")
+        with pytest.raises(asun.AsunError):
+            asun.decode("{cfg@{name@str}}:(x)")
 
     def test_nested_structured_value_rejected(self):
-        with pytest.raises(ason.AsonError):
-            ason.encodeTyped({"cfg": {"name": "web"}})
+        with pytest.raises(asun.AsunError):
+            asun.encodeTyped({"cfg": {"name": "web"}})
 
     def test_unclosed_block_comment_rejected(self):
-        with pytest.raises(ason.AsonError):
-            ason.decode("/* broken {id@int,name@str}:(1,Alice)")
+        with pytest.raises(asun.AsunError):
+            asun.decode("/* broken {id@int,name@str}:(1,Alice)")
 
 
 # ---------------------------------------------------------------------------
@@ -322,44 +322,44 @@ class TestDecodeErrors:
 class TestFormatValidation:
     def test_good_array_multi(self):
         good = "[{id@int, name@str}]:\n  (1, Alice),\n  (2, Bob),\n  (3, Carol)"
-        out = ason.decode(good)
+        out = asun.decode(good)
         assert isinstance(out, list)
         assert len(out) == 3
         assert out[0] == {"id": 1, "name": "Alice"}
 
     def test_good_single_struct(self):
-        out = ason.decode("{id@int,name@str}:(1,Alice)")
+        out = asun.decode("{id@int,name@str}:(1,Alice)")
         assert out == {"id": 1, "name": "Alice"}
 
     def test_good_vec_single_item(self):
-        out = ason.decode("[{id@int,name@str}]:(1,Alice)")
+        out = asun.decode("[{id@int,name@str}]:(1,Alice)")
         assert isinstance(out, list)
         assert len(out) == 1
         assert out[0] == {"id": 1, "name": "Alice"}
 
     def test_encode_decode_consistency(self):
         rows = [{"id": 7, "name": "Carol"}]
-        out = ason.decode(ason.encodeTyped(rows))
+        out = asun.decode(asun.encodeTyped(rows))
         assert out == rows
 
     def test_block_comments_before_and_between_tokens(self):
         text = '/* top */ {id@int, name@str, active@bool}: /* row */ (1, /* name */ Alice, true)'
-        out = ason.decode(text)
+        out = asun.decode(text)
         assert out == {"id": 1, "name": "Alice", "active": True}
 
     def test_block_comments_between_rows_in_slice(self):
         text = '/* users */ [{id@int,name@str}]: /* first */ (1,Alice), /* second */ (2,Bob)'
-        out = ason.decode(text)
+        out = asun.decode(text)
         assert out == [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 
     def test_block_comment_after_plain_value_before_comma(self):
         text = '{id@int,name@str,active@bool}:(1,Alice /* name */,true)'
-        out = ason.decode(text)
+        out = asun.decode(text)
         assert out == {"id": 1, "name": "Alice", "active": True}
 
     def test_block_comments_inside_schema(self):
         text = '{id@int, /* label */ name@str, active@bool}:(1,Alice,true)'
-        out = ason.decode(text)
+        out = asun.decode(text)
         assert out == {"id": 1, "name": "Alice", "active": True}
 
 
@@ -369,43 +369,43 @@ class TestFormatValidation:
 
 class TestFieldNamesSpecialChars:
     def test_decode_plus_minus(self):
-        out = ason.decode("{a+b@int, c-d@str}:(42,hello)")
+        out = asun.decode("{a+b@int, c-d@str}:(42,hello)")
         assert out["a+b"] == 42
         assert out["c-d"] == "hello"
 
     def test_decode_underscore(self):
-        out = ason.decode("{user_name@str, is_active@bool}:(Alice,true)")
+        out = asun.decode("{user_name@str, is_active@bool}:(Alice,true)")
         assert out["user_name"] == "Alice"
         assert out["is_active"] is True
 
     def test_encode_decode_roundtrip_special(self):
         obj = {"user_name": "Alice", "is_active": True}
-        out = ason.decode(ason.encodeTyped(obj))
+        out = asun.decode(asun.encodeTyped(obj))
         assert out == obj
 
     def test_quoted_schema_names_roundtrip_all_text_apis(self):
         obj = {"id uuid": 1, "65": "Alice", '{}[]@"': True}
 
-        untyped = ason.encode(obj)
+        untyped = asun.encode(obj)
         assert untyped.startswith('{"id uuid","65","{}[]@\\""')
-        assert ason.decode(untyped) == {"id uuid": "1", "65": "Alice", '{}[]@"': "true"}
+        assert asun.decode(untyped) == {"id uuid": "1", "65": "Alice", '{}[]@"': "true"}
 
-        typed = ason.encodeTyped(obj)
+        typed = asun.encodeTyped(obj)
         assert typed.startswith('{"id uuid"@int,"65"@str,"{}[]@\\""@bool}')
-        assert ason.decode(typed) == obj
+        assert asun.decode(typed) == obj
 
-        pretty = ason.encodePretty(obj)
-        assert ason.decode(pretty) == {"id uuid": "1", "65": "Alice", '{}[]@"': "true"}
+        pretty = asun.encodePretty(obj)
+        assert asun.decode(pretty) == {"id uuid": "1", "65": "Alice", '{}[]@"': "true"}
 
-        pretty_typed = ason.encodePrettyTyped(obj)
-        assert ason.decode(pretty_typed) == obj
+        pretty_typed = asun.encodePrettyTyped(obj)
+        assert asun.decode(pretty_typed) == obj
 
     def test_decode_explicit_quoted_schema_names(self):
-        out = ason.decode('{"id uuid"@int,"65"@str,"{}[]@\\""@bool}:(1,Alice,true)')
+        out = asun.decode('{"id uuid"@int,"65"@str,"{}[]@\\""@bool}:(1,Alice,true)')
         assert out == {"id uuid": 1, "65": "Alice", '{}[]@"': True}
 
     def test_binary_with_quoted_schema_names(self):
         obj = {"id uuid": 1, "65": "Alice", '{}[]@"': True}
-        data = ason.encodeBinary(obj)
-        out = ason.decodeBinary(data, '{"id uuid"@int,"65"@str,"{}[]@\\""@bool}')
+        data = asun.encodeBinary(obj)
+        out = asun.decodeBinary(data, '{"id uuid"@int,"65"@str,"{}[]@\\""@bool}')
         assert out == obj

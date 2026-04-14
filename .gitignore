@@ -14,3 +14,4 @@ dist/
 
 # Temporary Python header extraction
 /tmp/pydev_lib/
+.pytest_cache/

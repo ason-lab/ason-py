@@ -1,5 +1,6 @@
-"""Build script for ason C++ pybind11 extension (PEP 517 / setuptools)."""
+"""Build script for asun C++ pybind11 extension (PEP 517 / setuptools)."""
 import sys
+import sysconfig
 import subprocess
 from pathlib import Path
 
@@ -23,7 +24,8 @@ class CMakeBuild(build_ext):
         cmake_args = [
             f"-DCMAKE_BUILD_TYPE={cfg}",
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={ext_dir}",
-            f"-DPYTHON_EXECUTABLE={sys.executable}",
+            f"-DPython3_EXECUTABLE={sys.executable}",
+            f"-DASUN_EXTENSION_SUFFIX={sysconfig.get_config_var('EXT_SUFFIX') or ''}",
         ]
         build_args = ["--config", cfg, "--parallel"]
 
@@ -37,26 +39,26 @@ class CMakeBuild(build_ext):
 
         # Ship typing metadata alongside the extension module so type checkers
         # can discover it from the installed wheel (PEP 561, top-level module).
-        for filename in ("ason.pyi", "py.typed"):
+        for filename in ("asun.pyi", "py.typed"):
             src = Path(__file__).parent / filename
             dst = ext_dir / filename
             dst.write_bytes(src.read_bytes())
 
 
 setup(
-    name="ason",
+    name="asun",
     version="1.0.0",
-    author="ason contributors",
-    description="High-performance ASON (Array-Schema Object Notation) Python extension",
+    author="asun contributors",
+    description="High-performance ASUN (Array-Schema Unified Notation) Python extension",
     long_description=(Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
-    ext_modules=[CMakeExtension("ason")],
+    ext_modules=[CMakeExtension("asun")],
     cmdclass={"build_ext": CMakeBuild},
     python_requires=">=3.8",
-    url="https://github.com/ason-lab/ason-py",
+    url="https://github.com/asun-lab/asun-py",
     project_urls={
-        "Repository": "https://github.com/ason-lab/ason-py",
-        "Issues": "https://github.com/ason-lab/ason-py/issues",
+        "Repository": "https://github.com/asun-lab/asun-py",
+        "Issues": "https://github.com/asun-lab/asun-py/issues",
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

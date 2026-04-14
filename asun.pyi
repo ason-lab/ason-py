@@ -1,10 +1,10 @@
 from typing import Any
 
 JsonObject = dict[str, Any]
-AsonResult = JsonObject | list[JsonObject]
+AsunResult = JsonObject | list[JsonObject]
 
 def encode(obj: JsonObject | list[JsonObject]) -> str:
-    """Encode to ASON text with inferred *untyped* schema.
+    """Encode to ASUN text with inferred *untyped* schema.
 
     The schema header contains no type annotations, e.g. ``{id,name,active}``.
     This produces the shortest output.
@@ -21,7 +21,7 @@ def encode(obj: JsonObject | list[JsonObject]) -> str:
     ...
 
 def encodeTyped(obj: JsonObject | list[JsonObject]) -> str:
-    """Encode to ASON text with inferred *typed* schema.
+    """Encode to ASUN text with inferred *typed* schema.
 
     The schema header includes type annotations, e.g. ``{id@int,name@str,active@bool}``.
     Type inference rules:
@@ -43,21 +43,21 @@ def encodeTyped(obj: JsonObject | list[JsonObject]) -> str:
     ...
 
 def encodePretty(obj: JsonObject | list[JsonObject]) -> str:
-    """Encode to pretty-printed ASON text with inferred *untyped* schema.
+    """Encode to pretty-printed ASUN text with inferred *untyped* schema.
 
     Equivalent to ``encode()`` with indented tuple rows.
     """
     ...
 
 def encodePrettyTyped(obj: JsonObject | list[JsonObject]) -> str:
-    """Encode to pretty-printed ASON text with inferred *typed* schema.
+    """Encode to pretty-printed ASUN text with inferred *typed* schema.
 
     Equivalent to ``encodeTyped()`` with indented tuple rows.
     """
     ...
 
-def decode(text: str) -> AsonResult:
-    """Decode ASON text to ``dict`` or ``list[dict]``.
+def decode(text: str) -> AsunResult:
+    """Decode ASUN text to ``dict`` or ``list[dict]``.
 
     The schema is embedded in the text itself (produced by any of the encode
     functions).  Both typed and untyped schemas are supported:
@@ -82,10 +82,10 @@ def decode(text: str) -> AsonResult:
     ...
 
 def encodeBinary(obj: JsonObject | list[JsonObject]) -> bytes:
-    """Encode to ASON binary format.
+    """Encode to ASUN binary format.
 
     Schema is inferred internally from the object — no schema argument needed.
-    The resulting bytes are byte-identical to ason-rs and ason-go binary output.
+    The resulting bytes are byte-identical to asun-rs and asun-go binary output.
 
     Example::
 
@@ -93,8 +93,8 @@ def encodeBinary(obj: JsonObject | list[JsonObject]) -> bytes:
     """
     ...
 
-def decodeBinary(data: bytes, schema: str) -> AsonResult:
-    """Decode ASON binary bytes.
+def decodeBinary(data: bytes, schema: str) -> AsunResult:
+    """Decode ASUN binary bytes.
 
     ``schema`` is **required** because the binary wire format carries no embedded
     type information. The current Python binding accepts flat struct / slice

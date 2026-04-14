@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-"""ASON Python benchmark.
+"""ASUN Python benchmark.
 
-Output style follows the repository's JSON / ASON / BIN comparison format.
+Output style follows the repository's JSON / ASUN / BIN comparison format.
 The Python extension currently benchmarks flat structs and flat record slices.
 """
 
@@ -13,7 +13,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import ason
+import asun
 
 
 _NAMES = ["Alice", "Bob", "Carol", "David", "Eve", "Frank", "Grace", "Hank"]
@@ -61,24 +61,24 @@ def print_section(title: str, width: int = 68) -> None:
 def print_result(
     name: str,
     json_ser_ms: float,
-    ason_ser_ms: float,
+    asun_ser_ms: float,
     bin_ser_ms: float,
     json_de_ms: float,
-    ason_de_ms: float,
+    asun_de_ms: float,
     bin_de_ms: float,
     json_bytes: int,
-    ason_bytes: int,
+    asun_bytes: int,
     bin_bytes: int,
 ) -> None:
     print(f"  {name}")
     print(
         f"    Serialize:   JSON {json_ser_ms:8.2f}ms/{json_bytes}B | "
-        f"ASON {ason_ser_ms:8.2f}ms({format_ratio(json_ser_ms, ason_ser_ms)})/{ason_bytes}B({format_percent(ason_bytes, json_bytes)}) | "
+        f"ASUN {asun_ser_ms:8.2f}ms({format_ratio(json_ser_ms, asun_ser_ms)})/{asun_bytes}B({format_percent(asun_bytes, json_bytes)}) | "
         f"BIN {bin_ser_ms:8.2f}ms({format_ratio(json_ser_ms, bin_ser_ms)})/{bin_bytes}B({format_percent(bin_bytes, json_bytes)})"
     )
     print(
         f"    Deserialize: JSON {json_de_ms:8.2f}ms | "
-        f"ASON {ason_de_ms:8.2f}ms({format_ratio(json_de_ms, ason_de_ms)}) | "
+        f"ASUN {asun_de_ms:8.2f}ms({format_ratio(json_de_ms, asun_de_ms)}) | "
         f"BIN {bin_de_ms:8.2f}ms({format_ratio(json_de_ms, bin_de_ms)})"
     )
 
@@ -116,27 +116,27 @@ def make_all_types(n: int) -> list[dict]:
 
 def run_case(name: str, value, binary_schema: str, iterations: int) -> None:
     json_data = compact_json(value)
-    ason_text = ason.encodeTyped(value)
-    bin_data = ason.encodeBinary(value)
+    asun_text = asun.encodeTyped(value)
+    bin_data = asun.encodeBinary(value)
 
     json_ser_ms = bench(lambda: compact_json(value), iterations)
-    ason_ser_ms = bench(lambda: ason.encodeTyped(value), iterations)
-    bin_ser_ms = bench(lambda: ason.encodeBinary(value), iterations)
+    asun_ser_ms = bench(lambda: asun.encodeTyped(value), iterations)
+    bin_ser_ms = bench(lambda: asun.encodeBinary(value), iterations)
 
     json_de_ms = bench(lambda: json.loads(json_data), iterations)
-    ason_de_ms = bench(lambda: ason.decode(ason_text), iterations)
-    bin_de_ms = bench(lambda: ason.decodeBinary(bin_data, binary_schema), iterations)
+    asun_de_ms = bench(lambda: asun.decode(asun_text), iterations)
+    bin_de_ms = bench(lambda: asun.decodeBinary(bin_data, binary_schema), iterations)
 
     print_result(
         name,
         json_ser_ms,
-        ason_ser_ms,
+        asun_ser_ms,
         bin_ser_ms,
         json_de_ms,
-        ason_de_ms,
+        asun_de_ms,
         bin_de_ms,
         len(json_data),
-        len(ason_text.encode()),
+        len(asun_text.encode()),
         len(bin_data),
     )
 
@@ -176,39 +176,39 @@ def run_throughput_section() -> None:
     print_section("Section 5: Throughput Summary")
     rows = make_users(1000)
     json_data = compact_json(rows)
-    ason_text = ason.encodeTyped(rows)
-    bin_data = ason.encodeBinary(rows)
+    asun_text = asun.encodeTyped(rows)
+    bin_data = asun.encodeBinary(rows)
     iterations = 100
     total_records = len(rows) * iterations
 
     json_ser_ms = bench(lambda: compact_json(rows), iterations)
-    ason_ser_ms = bench(lambda: ason.encodeTyped(rows), iterations)
-    bin_ser_ms = bench(lambda: ason.encodeBinary(rows), iterations)
+    asun_ser_ms = bench(lambda: asun.encodeTyped(rows), iterations)
+    bin_ser_ms = bench(lambda: asun.encodeBinary(rows), iterations)
     json_de_ms = bench(lambda: json.loads(json_data), iterations)
-    ason_de_ms = bench(lambda: ason.decode(ason_text), iterations)
-    bin_de_ms = bench(lambda: ason.decodeBinary(bin_data, FLAT_SCHEMA_BIN), iterations)
+    asun_de_ms = bench(lambda: asun.decode(asun_text), iterations)
+    bin_de_ms = bench(lambda: asun.decodeBinary(bin_data, FLAT_SCHEMA_BIN), iterations)
 
     json_ser_rps = total_records / (json_ser_ms / 1000.0)
-    ason_ser_rps = total_records / (ason_ser_ms / 1000.0)
+    asun_ser_rps = total_records / (asun_ser_ms / 1000.0)
     bin_ser_rps = total_records / (bin_ser_ms / 1000.0)
     json_de_rps = total_records / (json_de_ms / 1000.0)
-    ason_de_rps = total_records / (ason_de_ms / 1000.0)
+    asun_de_rps = total_records / (asun_de_ms / 1000.0)
     bin_de_rps = total_records / (bin_de_ms / 1000.0)
 
-    print(f"  Serialize throughput:   JSON {json_ser_rps:12,.0f} rec/s | ASON {ason_ser_rps:12,.0f} rec/s | BIN {bin_ser_rps:12,.0f} rec/s")
-    print(f"  Deserialize throughput: JSON {json_de_rps:12,.0f} rec/s | ASON {ason_de_rps:12,.0f} rec/s | BIN {bin_de_rps:12,.0f} rec/s")
-    ason_bytes = len(ason_text.encode())
-    print(f"  Size baseline (1k rows): JSON {len(json_data)}B | ASON {ason_bytes}B({format_percent(ason_bytes, len(json_data))}) | BIN {len(bin_data)}B({format_percent(len(bin_data), len(json_data))})")
+    print(f"  Serialize throughput:   JSON {json_ser_rps:12,.0f} rec/s | ASUN {asun_ser_rps:12,.0f} rec/s | BIN {bin_ser_rps:12,.0f} rec/s")
+    print(f"  Deserialize throughput: JSON {json_de_rps:12,.0f} rec/s | ASUN {asun_de_rps:12,.0f} rec/s | BIN {bin_de_rps:12,.0f} rec/s")
+    asun_bytes = len(asun_text.encode())
+    print(f"  Size baseline (1k rows): JSON {len(json_data)}B | ASUN {asun_bytes}B({format_percent(asun_bytes, len(json_data))}) | BIN {len(bin_data)}B({format_percent(len(bin_data), len(json_data))})")
     print()
 
 
 def main() -> None:
     print("╔══════════════════════════════════════════════════════════════╗")
-    print("║               ASON Python vs JSON Benchmark                  ║")
+    print("║               ASUN Python vs JSON Benchmark                  ║")
     print("╚══════════════════════════════════════════════════════════════╝")
     print(f"\nSystem: {platform.system()} {platform.machine()} | Python {platform.python_version()}")
-    print("Mode: compact JSON vs typed ASON text vs ASON binary")
-    print("Scope: flat structs / flat record slices supported by ason-py")
+    print("Mode: compact JSON vs typed ASUN text vs ASUN binary")
+    print("Scope: flat structs / flat record slices supported by asun-py")
     print()
 
     run_flat_section()
