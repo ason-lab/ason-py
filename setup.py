@@ -47,7 +47,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="asun",
-    version="1.0.0",
+    version="1.0.1",
     author="asun contributors",
     description="High-performance ASUN (Array-Schema Unified Notation) Python extension",
     long_description=(Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
@@ -55,10 +55,10 @@ setup(
     ext_modules=[CMakeExtension("asun")],
     cmdclass={"build_ext": CMakeBuild},
     python_requires=">=3.8",
-    url="https://github.com/asun-lab/asun-py",
+    url="https://github.com/asunLab/asun-py",
     project_urls={
-        "Repository": "https://github.com/asun-lab/asun-py",
-        "Issues": "https://github.com/asun-lab/asun-py/issues",
+        "Repository": "https://github.com/asunLab/asun-py",
+        "Issues": "https://github.com/asunLab/asun-py/issues",
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

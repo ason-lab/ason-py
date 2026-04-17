@@ -7,7 +7,7 @@
 
 wheel 中同时包含 `asun.pyi` 和 `py.typed`，因此编辑器和静态类型检查器无需额外安装 stub 包也能识别这个扩展模块。
 
-[English Documentation](README.md)
+[English Documentation](https://github.com/asunLab/asun-py/blob/main/README.md)
 
 ---
 

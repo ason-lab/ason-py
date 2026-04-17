@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asun"
-version = "1.0.0"
+version = "1.0.1"
 description = "High-performance ASUN (Array-Schema Unified Notation) Python extension."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -28,9 +28,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/asun-lab/asun-py"
-Repository = "https://github.com/asun-lab/asun-py"
-Issues = "https://github.com/asun-lab/asun-py/issues"
+Homepage = "https://github.com/asunLab/asun-py"
+Repository = "https://github.com/asunLab/asun-py"
+Issues = "https://github.com/asunLab/asun-py/issues"
 
 [tool.cibuildwheel]
 build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"

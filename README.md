@@ -7,7 +7,7 @@ Provides 7 functions without requiring manual schema strings for encoding:
 
 The wheel also ships `asun.pyi` and `py.typed`, so editors and static type checkers can understand the extension module without a separate stub package.
 
-[中文文档](README_CN.md)
+[中文文档](https://github.com/asunLab/asun-py/blob/main/README_CN.md)
 
 ---
 
