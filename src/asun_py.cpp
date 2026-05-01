@@ -426,36 +426,65 @@ static void append_float(std::string& out, double v) {
 // ---------------------------------------------------------------------------
 static bool needs_quoting(const char* s, size_t n) noexcept {
     if (n == 0) return true;
-    if ((unsigned char)s[0] <= ' ' || (unsigned char)s[n-1] <= ' ') return true;
-    bool all_num = true;
-    size_t ni = (s[0] == '-') ? 1 : 0;
-    if (ni >= n) all_num = false;
+    unsigned char first = (unsigned char)s[0];
+    unsigned char last  = (unsigned char)s[n-1];
+    // Leading/trailing ASCII whitespace forces quoting (SPEC §S2 trim).
+    if (first == ' ' || first == '\t' || first == '\n' || first == '\r' ||
+        last  == ' ' || last  == '\t' || last  == '\n' || last  == '\r') return true;
+    if ((n == 4  && std::memcmp(s, "true",  4) == 0) ||
+        (n == 5  && std::memcmp(s, "false", 5) == 0) ||
+        (n == 4  && std::memcmp(s, "True",  4) == 0) ||
+        (n == 5  && std::memcmp(s, "False", 5) == 0) ||
+        (n == 4  && std::memcmp(s, "TRUE",  4) == 0) ||
+        (n == 5  && std::memcmp(s, "FALSE", 5) == 0)) return true;
     for (size_t i = 0; i < n; ++i) {
         unsigned char c = (unsigned char)s[i];
-        if (c < 32 || c == ',' || c == '(' || c == ')' ||
-            c == '[' || c == ']' || c == '@' || c == '"' || c == '\\') return true;
-        if (all_num && i >= ni && !(c >= '0' && c <= '9') && c != '.') all_num = false;
+        if (c < 32 || c == 0x7f) return true;
+        switch (c) {
+            case ',': case '@': case '(': case ')':
+            case '[': case ']': case '{': case '}':
+            case ':': case '<': case '>':
+            case '/': case '*':
+            case '"': case '\\':
+                return true;
+            default: break;
+        }
     }
-    if (all_num && n > ni) return true;
-    if (n == 4 && s[0]=='t'&&s[1]=='r'&&s[2]=='u'&&s[3]=='e') return true;
-    if (n == 5 && s[0]=='f'&&s[1]=='a'&&s[2]=='l'&&s[3]=='s'&&s[4]=='e') return true;
+    // Number-like prefix forces quoting.
+    if (first >= '0' && first <= '9') return true;
+    if ((first == '-' || first == '+') && n >= 2) {
+        unsigned char c1 = (unsigned char)s[1];
+        if (c1 >= '0' && c1 <= '9') return true;
+    }
+    if (first == '.' && n >= 2) {
+        unsigned char c1 = (unsigned char)s[1];
+        if (c1 >= '0' && c1 <= '9') return true;
+    }
     return false;
 }
 
 static void append_escaped(std::string& out, const char* s, size_t n) {
     if (!needs_quoting(s, n)) { out.append(s, n); return; }
     out += '"';
+    static const char HEX[] = "0123456789abcdef";
     size_t i = 0;
     while (i < n) {
         size_t run = i;
-        while (run < n && s[run] != '"' && s[run] != '\\' && s[run] != '\n' && s[run] != '\t') ++run;
+        while (run < n) {
+            unsigned char rc = (unsigned char)s[run];
+            if (rc == '"' || rc == '\\' || rc < 0x20 || rc == 0x7f) break;
+            ++run;
+        }
         if (run > i) { out.append(s + i, run - i); i = run; continue; }
-        char c = s[i++];
+        unsigned char c = (unsigned char)s[i++];
         if      (c == '"')  out += "\\\"";
         else if (c == '\\') out += "\\\\";
         else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
         else if (c == '\t') out += "\\t";
-        else                out += c;
+        else if (c == 0x08) out += "\\b";
+        else if (c == 0x0c) out += "\\f";
+        else { out += "\\u00"; out += HEX[(c >> 4) & 0xf]; out += HEX[c & 0xf]; }
     }
     out += '"';
 }
@@ -631,10 +660,87 @@ static void encode_rows(std::string& out, const InferredSchema& sc, PyObject* da
 }
 
 // ---------------------------------------------------------------------------
+// Untyped value encoding (scalar / list / None) — round-trippable text form
+// ---------------------------------------------------------------------------
+static void encode_untyped(std::string& out, PyObject* v) {
+    if (v == nullptr || v == Py_None) {
+        // Untyped null marker
+        out += "()";
+        return;
+    }
+    if (PyBool_Check(v)) {
+        out += (v == Py_True) ? "true" : "false";
+        return;
+    }
+    if (PyLong_CheckExact(v) || PyLong_Check(v)) {
+        int overflow = 0;
+        long long iv = PyLong_AsLongLongAndOverflow(v, &overflow);
+        if (overflow == 0) {
+            append_i64(out, iv);
+            return;
+        }
+        // Big int → fall back to PyObject_Str (no overflow loss).
+        PyObject* s = PyObject_Str(v);
+        if (!s) asun_throw("int->str failed");
+        Py_ssize_t sz;
+        const char* cs = PyUnicode_AsUTF8AndSize(s, &sz);
+        // Quote large numerics that don't fit i64 to avoid decoder ambiguity.
+        append_escaped(out, cs, (size_t)sz);
+        Py_DECREF(s);
+        return;
+    }
+    if (PyFloat_Check(v)) {
+        append_float(out, PyFloat_AsDouble(v));
+        return;
+    }
+    if (PyUnicode_Check(v)) {
+        Py_ssize_t sz;
+        const char* s = PyUnicode_AsUTF8AndSize(v, &sz);
+        if (!s) asun_throw("str encode failed");
+        append_escaped(out, s, (size_t)sz);
+        return;
+    }
+    if (PyList_Check(v) || PyTuple_Check(v)) {
+        const bool is_tuple = PyTuple_Check(v);
+        Py_ssize_t n = is_tuple ? PyTuple_GET_SIZE(v) : PyList_GET_SIZE(v);
+        out += '[';
+        for (Py_ssize_t i = 0; i < n; ++i) {
+            if (i > 0) out += ',';
+            PyObject* item = is_tuple ? PyTuple_GET_ITEM(v, i) : PyList_GET_ITEM(v, i);
+            encode_untyped(out, item);
+        }
+        out += ']';
+        return;
+    }
+    if (PyDict_Check(v)) {
+        asun_throw("dict in untyped path is not supported here");
+    }
+    asun_throw("unsupported value for untyped encode");
+}
+
+// True iff this is a list whose first element is a dict (slice-of-struct form).
+static inline bool is_list_of_dicts(PyObject* v) {
+    if (!PyList_Check(v)) return false;
+    Py_ssize_t n = PyList_GET_SIZE(v);
+    if (n == 0) return false;
+    PyObject* first = PyList_GET_ITEM(v, 0);
+    return first != nullptr && PyDict_Check(first);
+}
+
+// ---------------------------------------------------------------------------
 // encode(obj) → str   [untyped schema, inferred]
 // ---------------------------------------------------------------------------
 static std::string asun_encode(py::object obj) {
     PyObject* ptr = obj.ptr();
+    // Untyped fallback: scalar / plain list / tuple / None.
+    if (ptr == Py_None ||
+        PyBool_Check(ptr) || PyLong_Check(ptr) || PyFloat_Check(ptr) ||
+        PyUnicode_Check(ptr) || PyTuple_Check(ptr) ||
+        (PyList_Check(ptr) && !is_list_of_dicts(ptr))) {
+        std::string out;
+        encode_untyped(out, ptr);
+        return out;
+    }
     bool is_slice = PyList_Check(ptr);
     PyObject* sample = is_slice ? (PyList_GET_SIZE(ptr) > 0 ? PyList_GET_ITEM(ptr, 0) : nullptr) : ptr;
 
@@ -716,25 +822,44 @@ static PyObject* decode_value(const char*& p, const char* end, FieldType ft, std
             { p+=5; Py_INCREF(Py_False); return Py_False; }
         // Quoted string?
         if (*p == '"') return decode_value(p, end, FieldType::Str, tmp);
-        // Number?  -?[0-9]
+        // Number?  ABNF: ["-"] 1*DIGIT [ "." 1*DIGIT ] [ ("e"/"E") ["+"/"-"] 1*DIGIT ]
+        // Both fractional and exponent parts (if present) MUST have ≥1 digit.
         if ((*p >= '0' && *p <= '9') || (*p == '-' && p+1 < end && p[1] >= '0' && p[1] <= '9')) {
             const char* start = p;
             if (*p == '-') ++p;
+            const char* int_start = p;
             while (p < end && *p >= '0' && *p <= '9') ++p;
-            if (p < end && *p == '.') {
+            bool int_ok = (p > int_start);
+            bool is_float = false;
+            // Fractional part: must have ≥1 digit if '.' is present.
+            if (int_ok && p < end && *p == '.') {
+                const char* dot = p;
                 ++p;
+                const char* frac_start = p;
                 while (p < end && *p >= '0' && *p <= '9') ++p;
-                if (p >= end || *p == ',' || *p == ')' || *p == ']' || (unsigned char)*p <= ' ') {
+                if (p == frac_start) { p = dot; }
+                else { is_float = true; }
+            }
+            // Exponent: must have ≥1 digit after optional sign.
+            if (int_ok && p < end && (*p == 'e' || *p == 'E')) {
+                const char* mark = p;
+                ++p;
+                if (p < end && (*p == '+' || *p == '-')) ++p;
+                const char* exp_start = p;
+                while (p < end && *p >= '0' && *p <= '9') ++p;
+                if (p == exp_start) { p = mark; }
+                else { is_float = true; }
+            }
+            bool at_end = (p >= end || *p == ',' || *p == ')' || *p == ']' || (unsigned char)*p <= ' ');
+            if (int_ok && at_end) {
+                if (is_float) {
                     double v; std::from_chars(start, p, v);
                     return PyFloat_FromDouble(v);
                 }
-            } else {
-                if (p >= end || *p == ',' || *p == ')' || *p == ']' || (unsigned char)*p <= ' ') {
-                    long long v = 0; bool neg = (*start == '-');
-                    const char* q = neg ? start + 1 : start;
-                    while (q < p) { v = v * 10 + (*q - '0'); ++q; }
-                    return PyLong_FromLongLong(neg ? -v : v);
-                }
+                long long v = 0; bool neg = (*start == '-');
+                const char* q = neg ? start + 1 : start;
+                while (q < p) { v = v * 10 + (*q - '0'); ++q; }
+                return PyLong_FromLongLong(neg ? -v : v);
             }
             p = start;  // rewind — not a valid number
         }
@@ -777,6 +902,35 @@ static PyObject* decode_value(const char*& p, const char* end, FieldType ft, std
                         switch (*p) {
                             case '"': tmp+='"'; break; case '\\': tmp+='\\'; break;
                             case 'n': tmp+='\n'; break; case 't': tmp+='\t'; break;
+                            case 'r': tmp+='\r'; break; case 'b': tmp+='\b'; break;
+                            case 'f': tmp+='\f'; break;
+                            case '{': tmp+='{';  break; case '}': tmp+='}';  break;
+                            case '@': tmp+='@';  break;
+                            case 'u': {
+                                ++p;  // consume 'u'
+                                if (end - p < 4) asun_throw("invalid unicode escape");
+                                unsigned cp = 0;
+                                for (int i = 0; i < 4; ++i) {
+                                    char h = p[i];
+                                    unsigned d;
+                                    if (h >= '0' && h <= '9') d = h - '0';
+                                    else if (h >= 'a' && h <= 'f') d = 10 + h - 'a';
+                                    else if (h >= 'A' && h <= 'F') d = 10 + h - 'A';
+                                    else asun_throw("invalid unicode escape");
+                                    cp = (cp << 4) | d;
+                                }
+                                p += 3;  // consumed 4, but unconditional ++p below adds one
+                                if (cp < 0x80) tmp += (char)cp;
+                                else if (cp < 0x800) {
+                                    tmp += (char)(0xC0 | (cp >> 6));
+                                    tmp += (char)(0x80 | (cp & 0x3F));
+                                } else {
+                                    tmp += (char)(0xE0 | (cp >> 12));
+                                    tmp += (char)(0x80 | ((cp >> 6) & 0x3F));
+                                    tmp += (char)(0x80 | (cp & 0x3F));
+                                }
+                                break;
+                            }
                             default:  tmp+=*p;
                         }
                         ++p;
@@ -841,11 +995,244 @@ static PyObject* decode_tuple(const char*& p, const char* end, const CachedSchem
 // ---------------------------------------------------------------------------
 // decode(text) → dict | list[dict]
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Bare value parsing — top-level / plain-array context
+// ---------------------------------------------------------------------------
+// Stops at ',' ']' EOF (and at newline/EOF when not inside an array). Handles
+// the full escape set defined in SPEC §8.1, fallback-to-string for malformed
+// numbers, and trims trailing whitespace for unquoted strings.
+static PyObject* decode_bare_array(const char*& p, const char* end);
+static PyObject* decode_bare_value(const char*& p, const char* end, bool in_array) {
+    skip_ws_comments(p, end);
+    if (p >= end) { Py_INCREF(Py_None); return Py_None; }
+    if (*p == ',' || (in_array && *p == ']')) { Py_INCREF(Py_None); return Py_None; }
+
+    // `()` is the untyped null marker.
+    if (*p == '(' && (end - p) >= 2 && p[1] == ')') {
+        p += 2;
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    // Nested plain array.
+    if (*p == '[') return decode_bare_array(p, end);
+
+    // Quoted string — reuse decode_value's quoted path.
+    if (*p == '"') { std::string tmp; return decode_value(p, end, FieldType::Str, tmp); }
+
+    // Booleans (only when followed by terminator).
+    auto at_term = [&](const char* q) {
+        if (q >= end) return true;
+        char c = *q;
+        if (c == ',' || c == '\n' || c == '\r') return true;
+        if (in_array && c == ']') return true;
+        if (!in_array && (unsigned char)c <= ' ') {
+            // top-level: trailing whitespace ok (will be checked later)
+            return true;
+        }
+        return false;
+    };
+    if (end - p >= 4 && p[0]=='t' && p[1]=='r' && p[2]=='u' && p[3]=='e' && at_term(p+4)) {
+        p += 4; Py_INCREF(Py_True); return Py_True;
+    }
+    if (end - p >= 5 && p[0]=='f' && p[1]=='a' && p[2]=='l' && p[3]=='s' && p[4]=='e' && at_term(p+5)) {
+        p += 5; Py_INCREF(Py_False); return Py_False;
+    }
+
+    // Number? ABNF: ["-"] 1*DIGIT [ "." 1*DIGIT ] [ ("e"/"E") ["+"/"-"] 1*DIGIT ]
+    // Fractional and exponent parts MUST have ≥1 digit if present; otherwise
+    // we rewind and fall back to plain-string per the type-priority cascade.
+    const char* num_start = p;
+    bool neg = false;
+    if (*p == '-') { neg = true; ++p; }
+    const char* dig_start = p;
+    while (p < end && *p >= '0' && *p <= '9') ++p;
+    bool got_digits = (p > dig_start);
+    if (got_digits) {
+        bool is_float = false;
+        if (p < end && *p == '.') {
+            const char* dot = p;
+            ++p;
+            const char* frac_start = p;
+            while (p < end && *p >= '0' && *p <= '9') ++p;
+            if (p == frac_start) { p = dot; }
+            else { is_float = true; }
+        }
+        if (p < end && (*p == 'e' || *p == 'E')) {
+            const char* mark = p;
+            ++p;
+            if (p < end && (*p == '+' || *p == '-')) ++p;
+            const char* exp_start = p;
+            while (p < end && *p >= '0' && *p <= '9') ++p;
+            if (p == exp_start) { p = mark; }
+            else { is_float = true; }
+        }
+        if (at_term(p)) {
+            if (is_float) {
+                double v = 0;
+                std::from_chars(num_start, p, v);
+                return PyFloat_FromDouble(v);
+            }
+            long long v = 0;
+            const char* q = neg ? num_start + 1 : num_start;
+            while (q < p) { v = v * 10 + (*q - '0'); ++q; }
+            return PyLong_FromLongLong(neg ? -v : v);
+        }
+    }
+    p = num_start;  // rewind, fall through to plain-string path
+
+    // Plain unquoted string: read with escape handling, stop at delimiters.
+    std::string tmp;
+    const char* run_start = p;
+    while (p < end) {
+        char c = *p;
+        if (c == ',' || c == '\n' || c == '\r') break;
+        if (in_array && c == ']') break;
+        if (c == '\\' && p + 1 < end) {
+            // flush plain run before escape
+            tmp.append(run_start, p - run_start);
+            ++p;
+            char esc = *p++;
+            switch (esc) {
+                case '"':  tmp += '"';  break;
+                case '\\': tmp += '\\'; break;
+                case 'n':  tmp += '\n'; break;
+                case 't':  tmp += '\t'; break;
+                case 'r':  tmp += '\r'; break;
+                case 'b':  tmp += '\b'; break;
+                case 'f':  tmp += '\f'; break;
+                case ',':  tmp += ',';  break;
+                case '(':  tmp += '(';  break;
+                case ')':  tmp += ')';  break;
+                case '[':  tmp += '[';  break;
+                case ']':  tmp += ']';  break;
+                case '{':  tmp += '{';  break;
+                case '}':  tmp += '}';  break;
+                case '<':  tmp += '<';  break;
+                case '>':  tmp += '>';  break;
+                case ':':  tmp += ':';  break;
+                case '@':  tmp += '@';  break;
+                case 'u': {
+                    if (end - p < 4) asun_throw("invalid unicode escape");
+                    unsigned cp = 0;
+                    for (int i = 0; i < 4; ++i) {
+                        char h = p[i];
+                        unsigned d;
+                        if (h >= '0' && h <= '9') d = h - '0';
+                        else if (h >= 'a' && h <= 'f') d = 10 + h - 'a';
+                        else if (h >= 'A' && h <= 'F') d = 10 + h - 'A';
+                        else asun_throw("invalid unicode escape");
+                        cp = (cp << 4) | d;
+                    }
+                    p += 4;
+                    // encode codepoint as UTF-8
+                    if (cp < 0x80) tmp += (char)cp;
+                    else if (cp < 0x800) {
+                        tmp += (char)(0xC0 | (cp >> 6));
+                        tmp += (char)(0x80 | (cp & 0x3F));
+                    } else {
+                        tmp += (char)(0xE0 | (cp >> 12));
+                        tmp += (char)(0x80 | ((cp >> 6) & 0x3F));
+                        tmp += (char)(0x80 | (cp & 0x3F));
+                    }
+                    break;
+                }
+                default:   tmp += esc; break;  // unknown escape kept literal
+            }
+            run_start = p;
+            continue;
+        }
+        ++p;
+    }
+    tmp.append(run_start, p - run_start);
+
+    // Trim trailing whitespace.
+    while (!tmp.empty()) {
+        unsigned char c = (unsigned char)tmp.back();
+        if (c == ' ' || c == '\t') tmp.pop_back();
+        else break;
+    }
+    return PyUnicode_FromStringAndSize(tmp.data(), (Py_ssize_t)tmp.size());
+}
+
+static PyObject* decode_bare_array(const char*& p, const char* end) {
+    if (p >= end || *p != '[') asun_throw("expected '['");
+    ++p;
+    std::vector<PyObject*> items;
+    for (;;) {
+        skip_ws_comments(p, end);
+        if (p < end && *p == ']') { ++p; break; }
+        if (p >= end) {
+            for (auto* x : items) Py_DECREF(x);
+            asun_throw("unterminated array");
+        }
+        if (!items.empty()) {
+            if (*p != ',') {
+                for (auto* x : items) Py_DECREF(x);
+                asun_throw("expected ',' in array");
+            }
+            ++p;
+            skip_ws_comments(p, end);
+            if (p < end && *p == ']') { ++p; break; }
+        }
+        PyObject* v;
+        try {
+            v = decode_bare_value(p, end, /*in_array=*/true);
+        } catch (...) {
+            for (auto* x : items) Py_DECREF(x);
+            throw;
+        }
+        if (!v) { for (auto* x : items) Py_DECREF(x); throw py::error_already_set(); }
+        items.push_back(v);
+    }
+    PyObject* lst = PyList_New((Py_ssize_t)items.size());
+    if (!lst) { for (auto* x : items) Py_DECREF(x); throw std::bad_alloc(); }
+    for (size_t i = 0; i < items.size(); ++i)
+        PyList_SET_ITEM(lst, (Py_ssize_t)i, items[i]);
+    return lst;
+}
+
 static py::object asun_decode(const std::string& text) {
     const char* p   = text.c_str();
     const char* end = p + text.size();
 
     skip_ws_comments(p, end);
+
+    // SPEC §8.3: top level may be:
+    //   {schema}:(...)        single struct
+    //   [{schema}]:(...)      vec of structs
+    //   [...]                 plain array
+    //   <bare-value>          bare scalar / string
+    // Anything else (notably top-level `(...)`) is an error.
+    bool struct_form = (p < end && *p == '{');
+    bool vec_form    = (p + 1 < end && p[0] == '[' && p[1] == '{');
+
+    if (!struct_form && !vec_form) {
+        if (p >= end) asun_throw("empty input");
+        // `()` is the untyped null marker.
+        if (*p == '(' && (end - p) >= 2 && p[1] == ')') {
+            p += 2;
+            skip_ws_comments(p, end);
+            if (p < end) asun_throw("trailing characters after decoded value");
+            return py::none();
+        }
+        if (*p == '(') asun_throw("bare tuple at top level — schema required");
+
+        py::object out;
+        if (*p == '[') {
+            PyObject* arr = decode_bare_array(p, end);
+            out = py::reinterpret_steal<py::object>(arr);
+        } else {
+            PyObject* v = decode_bare_value(p, end, /*in_array=*/false);
+            if (!v) throw py::error_already_set();
+            out = py::reinterpret_steal<py::object>(v);
+        }
+
+        skip_ws_comments(p, end);
+        if (p < end) asun_throw("trailing characters after decoded value");
+        return out;
+    }
+
     const char* sc_start = p;
     int depth = 0;
     bool in_quote = false;
