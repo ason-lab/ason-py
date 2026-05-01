@@ -47,7 +47,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="asun",
-    version="1.0.1",
+    version="1.0.2",
     author="asun contributors",
     description="High-performance ASUN (Array-Schema Unified Notation) Python extension",
     long_description=(Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
